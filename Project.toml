@@ -1,0 +1,13 @@
+name = "SmoQyElPhQMC"
+uuid = "2e896e94-a4a1-44d3-bdd1-72a60ceb4988"
+authors = ["Benjamin Cohen-Stead <benwcs@gmail.com>", "Steven Johnston <sjohn145@utk.edu>"]
+version = "1.0.0-DEV"
+
+[compat]
+julia = "1.10"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]
