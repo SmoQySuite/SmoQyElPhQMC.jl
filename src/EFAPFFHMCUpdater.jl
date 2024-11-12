@@ -21,9 +21,7 @@ function EFAPFFHMCUpdater(;
     Nt::Int,
     Δt::E,
     η::E = 0.0,
-    δ::E = 0.05,
-    tol::E = 1e-5,
-    maxiter::Int = size(fermion_det_matrix,1)
+    δ::E = 0.05
 ) where {T<:Number, E<:AbstractFloat}
 
     (; β, Δτ, phonon_parameters, x) = electron_phonon_parameters
