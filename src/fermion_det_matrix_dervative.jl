@@ -1,14 +1,15 @@
-# calculate ⟨u|-∂M/∂x|v⟩
-function mul_n∂M∂x!(
-    ∂M∂x::AbstractMatrix{E},
-    u::AbstractVecOrMat{T},
-    v::AbstractVecOrMat{T},
+# calculate ν⋅Re[⟨u|∂M/∂x|v⟩]
+function mul_νRe∂M∂x!(
+    νRe∂M∂x::AbstractMatrix{E},
+    ν::E,
+    u::AbstractVecOrMat,
+    v::AbstractVecOrMat,
     fdm::SymFermionDetMatrix{T,E},
-    elph::ElectronPhononParameters{T,E}
+    elph::ElectronPhononParameters{T,E},
 ) where {T<:Number, E<:AbstractFloat}
 
     (; expnΔτV, coshΔτt, sinhΔτt, checkerboard_neighbor_table, checkerboard_colors, checkerboard_perm) = fdm
-    v′, u′ = _get_tmp(fdm, u)
+    v′, u′ = fdm.tmp1, fdm.tmp2
     Δτ = elph.Δτ
     ssh_parameters = elph.ssh_parameters_up
     holstein_parameters = elph.holstein_parameters_up
@@ -46,8 +47,8 @@ function mul_n∂M∂x!(
     if Nssh > 0
         # iterate over checkerboard colors in reverse order
         for color in Ncolors:-1:1
-            # calculate ⟨u′|[Δτ⋅∂Kc/∂x]|v′⟩
-            _mul_Δτ∂Kc∂x!(∂M∂x, u′, v′, fdm, elph, Δτ/2, color)
+            # calculate -ν⋅Re[⟨u′|Δτ⋅∂Kc/∂x|v′⟩]
+            _mul_νReΔτ∂Kc∂x!(νRe∂M∂x, -ν, u′, v′, fdm, elph, Δτ/2, color)
             # |u′⟩ := exp(-Δτ⋅Kc)|u′⟩
             checkerboard_lmul!(
                 u′, checkerboard_neighbor_table, coshΔτt, sinhΔτt,
@@ -77,8 +78,8 @@ function mul_n∂M∂x!(
 
     # check if there are any holstein coupling
     if Nholstein > 0
-        # calculate ⟨u′|[Δτ⋅∂V/∂x]|v′⟩
-        _mul_Δτ∂V∂x!(∂M∂x, u′, v′, elph)
+        # calculate -ν⋅Re[⟨u′|Δτ⋅∂V/∂x|v′⟩]
+        _mul_νReΔτ∂V∂x!(νRe∂M∂x, -ν, u′, v′, elph)
     end
 
     # |u′[l]⟩ := exp(-Δτ⋅V)|u′[l]⟩ so that |u′[l]⟩ = exp(-Δτ⋅V)⋅exp(-Δτ⋅K/2)ᵀ⋅|u[l]⟩
@@ -93,8 +94,8 @@ function mul_n∂M∂x!(
     if Nssh > 0
         # iterate over checkerboard colors in reverse order
         for color in 1:Ncolors
-            # calculate ⟨u′|[Δτ⋅∂Kc/∂x]|v′⟩
-            _mul_Δτ∂Kc∂x!(∂M∂x, u′, v′, fdm, elph, Δτ/2, color)
+            # calculate -ν⋅Re[⟨u′|Δτ⋅∂Kc/∂x|v′⟩]
+            _mul_νReΔτ∂Kc∂x!(νRe∂M∂x, -ν, u′, v′, fdm, elph, Δτ/2, color)
             # |u′⟩ := exp(-Δτ⋅Kc)|u′⟩
             checkerboard_lmul!(
                 u′, checkerboard_neighbor_table, coshΔτt, sinhΔτt,
@@ -111,17 +112,18 @@ function mul_n∂M∂x!(
     return nothing
 end
 
-# calculate ⟨u|-∂M/∂x|v⟩
-function mul_n∂M∂x!(
-    ∂M∂x::AbstractMatrix{E},
-    u::AbstractVecOrMat{T},
-    v::AbstractVecOrMat{T},
+# calculate ν⋅⟨u|Re(∂M/∂x)|v⟩
+function mul_νRe∂M∂x!(
+    νRe∂M∂x::AbstractMatrix{E},
+    ν::E,
+    u::AbstractVecOrMat,
+    v::AbstractVecOrMat,
     fdm::AsymFermionDetMatrix{T,E},
     elph::ElectronPhononParameters{T,E}
 ) where {T<:Number, E<:AbstractFloat}
 
     (; expnΔτV, coshΔτt, sinhΔτt, checkerboard_neighbor_table, checkerboard_colors, checkerboard_perm) = fdm
-    v′, u′ = _get_tmp(fdm, u)
+    v′, u′ = fdm.tmp1, fdm.tmp2
     Δτ = elph.Δτ
     ssh_parameters = elph.ssh_parameters_up
     holstein_parameters = elph.holstein_parameters_up
@@ -154,8 +156,8 @@ function mul_n∂M∂x!(
 
     # check if there are any holstein coupling
     if Nholstein > 0
-        # calculate ⟨u′|[Δτ⋅∂V/∂x]|v′⟩
-        _mul_Δτ∂V∂x!(∂M∂x, u′, v′, elph)
+        # calculate -ν⋅Re[⟨u′|Δτ⋅∂V/∂x|v′⟩]
+        _mul_νReΔτ∂V∂x!(νRe∂M∂x, -ν, u′, v′, elph)
     end
 
     # Lastly, evaluate terms from ⟨u[l]|exp(-Δτ⋅V[l])⋅[∂exp(-Δτ⋅K[l])/∂x]|v[l-1]⟩.
@@ -168,8 +170,8 @@ function mul_n∂M∂x!(
         @. v′ = v′ / expnΔτV
         # iterate over checkerboard colors in reverse order
         for color in Ncolors:-1:1
-            # calculate ⟨u′|[+Δτ⋅∂Kc/∂x]|v′⟩
-            _mul_Δτ∂Kc∂x!(∂M∂x, u′, v′, fdm, elph, Δτ, color)
+            # calculate -ν⋅Re[⟨u′|Δτ⋅∂Kc/∂x|v′⟩]
+            _mul_νReΔτ∂Kc∂x!(νRe∂M∂x, -ν, u′, v′, fdm, elph, Δτ, color)
             # |u′⟩ := exp(-Δτ⋅Kc)ᵀ|u′⟩ = exp(-Δτ⋅Kc)|u′⟩
             checkerboard_lmul!(
                 u′, checkerboard_neighbor_table, coshΔτt, sinhΔτt,
@@ -187,12 +189,13 @@ function mul_n∂M∂x!(
 end
 
 
-# calculate ⟨u′|[Δτ⋅∂Kc/∂x]|v′⟩ where Kc is the kinetic energy matrix associated with
+# calculate ν⋅⟨u′|Re(Δτ⋅∂Kc/∂x)|v′⟩ where Kc is the kinetic energy matrix associated with
 # one of the checkerboard colors
-function _mul_Δτ∂Kc∂x!(
-    ∂M∂x::AbstractMatrix{E},
-    u′::AbstractMatrix{T},
-    v′::AbstractMatrix{T},
+function _mul_νReΔτ∂Kc∂x!(
+    νRe∂M∂x::AbstractMatrix{E},
+    ν::E,
+    u′::AbstractMatrix,
+    v′::AbstractMatrix,
     fdm::AbstractFermionDetMatrix{T,E},
     elph::ElectronPhononParameters{T,E},
     Δτ::E,
@@ -223,25 +226,21 @@ function _mul_Δτ∂Kc∂x!(
                 j = checkerboard_neighbor_table[2,n]
                 # iterate over imaginary time slices
                 for l in axes(x,2)
-                    # calculate relative phonon position
+                    # calculate relative phonon position (x′ - x)
                     Δx = x[p′,l] - x[p,l]
                     # if mass of phonon p is finite
                     if isfinite(M[p])
                         # calculate Δτ⋅∂Kc/∂x[j,i]
                         ΔτdKcdx_ji = Δτ * (-α[c] - 2*α2[c]*Δx - 3*α3[c]*Δx^2 - 4*α4[c]*Δx^3)
-                        # calculate ⟨u′|∂M/∂x|v′⟩ += ⟨u′|[Δτ⋅∂Kc/∂x]|v′⟩
-                        #                         += conj(u′[j])⋅(-Δτ⋅∂Kc/∂x[j,i])⋅v′[i] + conj(u′[i])⋅(-Δτ⋅∂Kc/∂x[i,j])⋅v′[j]
-                        #                         += conj(u′[j])⋅(-Δτ⋅∂Kc/∂x[j,i])⋅v′[i] + conj(u′[i])⋅conj(-Δτ⋅∂Kc/∂x[j,i])⋅v′[j]
-                        ∂M∂x[p,l] += real(conj(u′[l,j]) * ΔτdKcdx_ji * v′[l,i] + conj(u′[l,i]) * conj(ΔτdKcdx_ji) * v′[l,j])
+                        # calculate ν⋅Re[⟨u′|Δτ⋅∂Kc/∂x|v′⟩]
+                        νRe∂M∂x[p,l] += ν * real( conj(u′[l,j]) * ΔτdKcdx_ji * v′[l,i] + conj(u′[l,i]) * conj(ΔτdKcdx_ji) * v′[l,j] )
                     end
                     # if mass of phonon p′ is finite
                     if isfinite(M[p′])
                         # calculate Δτ⋅∂Kc/∂x′[j,i]
                         ΔτdKcdx_ji = Δτ * (α[c] + 2*α2[c]*Δx + 3*α3[c]*Δx^2 + 4*α4[c]*Δx^3)
-                        # calculate ⟨u′|∂M/∂x′|v′⟩ += ⟨u′|[Δτ⋅∂Kc/∂x′]|v′⟩
-                        #                          += conj(u′[j])⋅(-Δτ⋅∂Kc/∂x′[j,i])⋅v′[i] + conj(u′[i])⋅(-Δτ⋅∂Kc/∂x′[i,j])⋅v′[j]
-                        #                          += conj(u′[j])⋅(-Δτ⋅∂Kc/∂x′[j,i])⋅v′[i] + conj(u′[i])⋅conj(-Δτ⋅∂Kc/∂x′[j,i])⋅v′[j]
-                        ∂M∂x[p′,l] += real(conj(u′[l,j]) * ΔτdKcdx_ji * v′[l,i] + conj(u′[l,i]) * conj(ΔτdKcdx_ji) * v′[l,j])
+                        # calculate ν⋅Re[⟨u′|Δτ⋅∂Kc/∂x|v′⟩]
+                        νRe∂M∂x[p′,l] += ν * real( conj(u′[l,j]) * ΔτdKcdx_ji * v′[l,i] + conj(u′[l,i]) * conj(ΔτdKcdx_ji) * v′[l,j] )
                     end
                 end
             end
@@ -252,11 +251,12 @@ function _mul_Δτ∂Kc∂x!(
 end
 
 
-# calculate ⟨u′|[Δτ⋅∂V/∂x]|v′⟩
-function _mul_Δτ∂V∂x!(
-    n∂M∂x::AbstractMatrix{E},
-    u′::AbstractMatrix{T},
-    v′::AbstractMatrix{T},
+# calculate ν⋅Re[⟨u′|Δτ⋅∂V/∂x|v′⟩]
+function _mul_νReΔτ∂V∂x!(
+    νν∂M∂x::AbstractMatrix{E},
+    ν::E,
+    u′::AbstractMatrix,
+    v′::AbstractMatrix,
     elph::ElectronPhononParameters{T,E},
 ) where {T<:Number, E<:AbstractFloat}
 
@@ -277,8 +277,8 @@ function _mul_Δτ∂V∂x!(
             for l in axes(x,2)
                 # calculate Δτ⋅∂V/∂x
                 ΔτdVdx = Δτ * (α[c] + 2*α2[c]*x[p,l] + 3*α3[c]*x[p,l]^2 + 4*α4[c]*x[p,l]^3)
-                # calculate ⟨u′|-∂M/dx|v′⟩ += ⟨u′|[Δτ⋅∂V/∂x]|v′⟩
-                n∂M∂x[p,l] += real(conj(u′[l,i]) * ΔτdVdx * v′[l,i])
+                # calculate ν⋅Re[⟨u′|Δτ⋅∂V/∂x|v′⟩]
+                νν∂M∂x[p,l] += ν * real(conj(u′[l,i]) * ΔτdVdx * v′[l,i])
             end
         end
     end

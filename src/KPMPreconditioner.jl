@@ -482,6 +482,9 @@ function update_preconditioner!(
     return nothing
 end
 
+# default update! preconditioner method does nothing
+update_preconditioner!(P, ignore...) = nothing
+
 
 # update B̄ propagator matrix
 function update_B̄!(B̄::SymChkbrdPropagator, fdm::SymFermionDetMatrix)

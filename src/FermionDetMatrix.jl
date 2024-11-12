@@ -49,13 +49,16 @@ struct SymFermionDetMatrix{T<:Number, E<:AbstractFloat} <: AbstractFermionDetMat
     checkerboard_neighbor_table::Matrix{Int}
     checkerboard_perm::Vector{Int}
     checkerboard_colors::Vector{UnitRange{Int}}
-    rtmp1::Matrix{E}
-    rtmp2::Matrix{E}
-    ztmp1::Matrix{Complex{E}}
-    ztmp2::Matrix{Complex{E}}
+    cgs::ConjugateGradientSolver{Complex{E}, E}
+    tmp1::Matrix{Complex{E}}
+    tmp2::Matrix{Complex{E}}
 end
 
-function SymFermionDetMatrix(fpi::FermionPathIntegral{T}) where {T<:Number}
+function SymFermionDetMatrix(
+    fpi::FermionPathIntegral{T, E};
+    maxiter::Int = (fpi.N * fpi.Lτ),
+    tol::E = 1e-5
+) where {T<:Number, E<:AbstractFloat}
 
     (; neighbor_table, t, V, N, β, Δτ, Lτ) = fpi
 
@@ -68,10 +71,11 @@ function SymFermionDetMatrix(fpi::FermionPathIntegral{T}) where {T<:Number}
     sinhΔτt = zeros(T, Lτ, Nh)
 
     # allocate temorary storage vector
-    rtmp1 = zeros(real(T), Lτ, N)
-    rtmp2 = zeros(real(T), Lτ, N)
-    ztmp1 = zeros(Complex{real(T)}, Lτ, N)
-    ztmp2 = zeros(Complex{real(T)}, Lτ, N)
+    tmp1 = zeros(Complex{real(T)}, Lτ, N)
+    tmp2 = zeros(Complex{real(T)}, Lτ, N)
+
+    # initialize conjugate gradient solver
+    cgs = ConjugateGradientSolver(tmp1, maxiter = maxiter, tol = tol)
 
     # construct checkerboard decomposition
     if iszero(Nh)
@@ -88,7 +92,7 @@ function SymFermionDetMatrix(fpi::FermionPathIntegral{T}) where {T<:Number}
     sym_fdm = SymFermionDetMatrix{T,real(T)}(
         expnΔτV, coshΔτt, sinhΔτt,
         checkerboard_neighbor_table, checkerboard_perm, checkerboard_color_intervals,
-        rtmp1, rtmp2, ztmp1, ztmp2
+        cgs, tmp1, tmp2
     )
 
     # upate FermionDetMatrixMultiplier
@@ -129,13 +133,16 @@ struct AsymFermionDetMatrix{T<:Number, E<:AbstractFloat} <: AbstractFermionDetMa
     checkerboard_neighbor_table::Matrix{Int}
     checkerboard_perm::Vector{Int}
     checkerboard_colors::Vector{UnitRange{Int}}
-    rtmp1::Matrix{E}
-    rtmp2::Matrix{E}
-    ztmp1::Matrix{Complex{E}}
-    ztmp2::Matrix{Complex{E}}
+    cgs::ConjugateGradientSolver{Complex{E}, E}
+    tmp1::Matrix{Complex{E}}
+    tmp2::Matrix{Complex{E}}
 end
 
-function AsymFermionDetMatrix(fpi::FermionPathIntegral{T}) where {T<:Number}
+function AsymFermionDetMatrix(
+    fpi::FermionPathIntegral{T, E};
+    maxiter::Int = (fpi.N * fpi.Lτ),
+    tol::E = 1e-5
+) where {T<:Number, E<:AbstractFloat}
 
     (; neighbor_table, t, N, Lτ) = fpi
 
@@ -148,10 +155,11 @@ function AsymFermionDetMatrix(fpi::FermionPathIntegral{T}) where {T<:Number}
     sinhΔτt = zeros(T, Lτ, Nh)
 
     # allocate temorary storage vector
-    rtmp1 = zeros(real(T), Lτ, N)
-    rtmp2 = zeros(real(T), Lτ, N)
-    ztmp1 = zeros(Complex{real(T)}, Lτ, N)
-    ztmp2 = zeros(Complex{real(T)}, Lτ, N)
+    tmp1 = zeros(Complex{real(T)}, Lτ, N)
+    tmp2 = zeros(Complex{real(T)}, Lτ, N)
+
+    # initialize conjugate gradient solver
+    cgs = ConjugateGradientSolver(tmp1, maxiter = maxiter, tol = tol)
 
     # construct checkerboard decomposition
     if iszero(Nh)
@@ -168,7 +176,7 @@ function AsymFermionDetMatrix(fpi::FermionPathIntegral{T}) where {T<:Number}
     asym_fdm = AsymFermionDetMatrix{T,real(T)}(
         expnΔτV, coshΔτt, sinhΔτt,
         checkerboard_neighbor_table, checkerboard_perm, checkerboard_color_intervals,
-        rtmp1, rtmp2, ztmp1, ztmp2
+        cgs, tmp1, tmp2
     )
 
     # upate FermionDetMatrixMultiplier
@@ -216,6 +224,46 @@ size(fdm::AbstractFermionDetMatrix) = (length(fdm.expnΔτV), length(fdm.expnΔ�
 size(fdm::AbstractFermionDetMatrix, dim::Int) = length(fdm.expnΔτV)
 
 
+# evaluate v′ = [Mᵀ⋅M]⁻¹⋅v
+function ldiv!(
+    v′::AbstractVecOrMat{Complex{E}},
+    fdm::AbstractFermionDetMatrix{T, E},
+    v::AbstractVecOrMat{Complex{E}};
+    preconditioner = I,
+    rng::AbstractRNG = Random.default_rng(),
+    maxiter::Int = fdm.cgs.maxiter,
+    tol::E = fdm.cgs.tol
+) where {T<:Number, E<:AbstractFloat}
+
+    (; cgs) = fdm
+    update_preconditioner!(preconditioner, fdm, rng)
+    iters, ϵ = cg_solve!(v′, fdm, v, cgs, preconditioner, maxiter = maxiter, tol = tol)
+
+    return iters, ϵ
+end
+
+# evaluate v = [Mᵀ⋅M]⁻¹⋅v
+function ldiv!(
+    fdm::AbstractFermionDetMatrix{T, E},
+    v::AbstractVecOrMat{Complex{E}};
+    preconditioner = I,
+    maxiter::Int = fdm.cgs.maxiter,
+    tol::E = fdm.cgs.tol,
+    rng::AbstractRNG = Random.default_rng()
+) where {T<:Number, E<:AbstractFloat}
+
+    iters, ϵ = ldiv!(
+        v, fdm, v,
+        preconditioner = preconditioner,
+        rng = rng,
+        maxiter = maxiter,
+        tol = tol
+    )
+
+    return iters, ϵ
+end
+
+
 # evaluate v = Mᵀ⋅M⋅v
 function lmul!(
     fdm::AbstractFermionDetMatrix,
@@ -260,7 +308,7 @@ function mul_MtM!(
     v::AbstractVecOrMat
 )
 
-    tmp1, _ =  _get_tmp(fdm, v)
+    (; tmp1) = fdm
     mul_M!(tmp1, fdm, v)
     mul_Mt!(v′, fdm, tmp1)
 
@@ -274,6 +322,7 @@ function lmul_MMt!(
     v::AbstractVecOrMat
 )
 
+    
     mul_MMt!(v, fdm, v)
 
     return nothing
@@ -287,7 +336,7 @@ function mul_MMt!(
     v::AbstractVecOrMat
 )
 
-    tmp1, _ =  _get_tmp(fdm, v)
+    (; tmp1) = fdm
     mul_Mt!(tmp1, fdm, v)
     mul_M!(v′, fdm, tmp1)
 
@@ -301,7 +350,7 @@ function lmul_M!(
     v::AbstractVecOrMat
 )
 
-    _, tmp2 =  _get_tmp(fdm, v)
+    (; tmp2) = fdm
     copyto!(tmp2, v)
     mul_M!(v, fdm, tmp2)
 
@@ -399,7 +448,7 @@ function lmul_Mt!(
     v::AbstractVecOrMat
 )
 
-    _, tmp2 =  _get_tmp(fdm, v)
+    (; tmp2) = fdm
     copyto!(tmp2, v)
     mul_Mt!(v, fdm, tmp2)
 
@@ -495,22 +544,4 @@ function mul_Mt!(
     end
 
     return nothing
-end
-
-# get temporary storage vectors of complex numbers
-function _get_tmp(
-    fdm::AbstractFermionDetMatrix,
-    v::AbstractVecOrMat{Complex{T}}
-) where {T<:AbstractFloat}
-
-    return fdm.ztmp1, fdm.ztmp2
-end
-
-# get temporary storage vectors of real numbers
-function _get_tmp(
-    fdm::AbstractFermionDetMatrix,
-    v::AbstractVecOrMat{T}
-) where {T<:AbstractFloat}
-
-    return fdm.rtmp1, fdm.rtmp2
 end

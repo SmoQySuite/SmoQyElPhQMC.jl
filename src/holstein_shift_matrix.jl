@@ -154,11 +154,12 @@ function ldiv_Λᵀ!(
     return nothing
 end
 
-# evaluate ⟨u′|-∂Λ/∂x|u⟩
-function mul_n∂Λ∂x!(
-    n∂Λ∂x::AbstractMatrix{E},
-    u′::AbstractVecOrMat{T},
-    u::AbstractVecOrMat{T},
+# evaluate ν⋅Re[⟨u′|∂Λ/∂x|u⟩]
+function mul_νRe∂Λ∂x!(
+    νRe∂Λ∂x::AbstractMatrix{E},
+    ν::E,
+    u′::AbstractVecOrMat,
+    u::AbstractVecOrMat,
     Λ::AbstractMatrix{E},
     electron_phonon_parameters::ElectronPhononParameters{T,E}
 ) where {T<:Number, E<:AbstractFloat}
@@ -189,8 +190,9 @@ function mul_n∂Λ∂x!(
                     site = neighbor_table[2, phonon]
                     # iterate over imaginary time slices
                     for l in axes(Λ, 1)                    
-                        # calculate ⟨v′|-∂Λ/∂x|v⟩
-                        n∂Λ∂x[phonon,l] -= real(v′[mod1(l-1,Lτ),site] * Δτ * (αc + 3*α3c * x[phonon,l]^2)/2 * Λ[l,phonon] * v[l,site])
+                        # calculate c⋅Re[⟨v′|∂Λ/∂x|v⟩]
+                        Δτ∂Λ∂x = Δτ * (αc + 3*α3c * x[phonon,l]^2)/2 * Λ[l,phonon]
+                        νRe∂Λ∂x[phonon,l] += ν * real( conj(v′[mod1(l-1,Lτ),site]) * Δτ∂Λ∂x * v[l,site] )
                     end
                 end
             end

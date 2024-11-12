@@ -66,7 +66,10 @@ end
         A,
         b::AbstractArray{T},
         cg_solver::ConjugateGradientSolver{T,E},
-        P::UniformScaling = I
+        P::UniformScaling = I;
+        # Keyword Arguments
+        maxiter::Int = cg_solver.maxiter,
+        tol::E = cg_solver.tol
     ) where {T<:Number, E<:AbstractFloat}
 
     cg_solve!(
@@ -74,7 +77,10 @@ end
         A,
         b::AbstractArray{T},
         cg_solver::ConjugateGradientSolver{T,E},
-        P
+        P;
+        # Keyword Arguments
+        maxiter::Int = cg_solver.maxiter,
+        tol::E = cg_solver.tol
     ) where {T<:Number, E<:AbstractFloat}
 
 Solve ``A \cdot x = b`` using the Conjugate Gradient method with
@@ -89,10 +95,13 @@ function cg_solve!(
     A,
     b::AbstractArray{T},
     cg_solver::ConjugateGradientSolver{T,E},
-    P::UniformScaling = I
+    P::UniformScaling = I;
+    # Keyword Arguments
+    maxiter::Int = cg_solver.maxiter,
+    tol::E = cg_solver.tol
 ) where {T<:Number, E<:AbstractFloat}
     
-    (; maxiter, tol, r, p, z) = cg_solver
+    (; r, p, z) = cg_solver
     x = reshaped(x, length(x))
     b = reshaped(b, length(b))
     
@@ -162,7 +171,10 @@ function cg_solve!(
     A,
     b::AbstractArray{T},
     cg_solver::ConjugateGradientSolver{T,E},
-    P
+    P;
+    # Keyword Arguments
+    maxiter::Int = cg_solver.maxiter,
+    tol::E = cg_solver.tol
 ) where {T<:Number, E<:AbstractFloat}
     
     (; maxiter, tol, r, p, z) = cg_solver

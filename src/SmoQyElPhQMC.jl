@@ -60,6 +60,6 @@ include("KPMPreconditioner.jl")
 export KPMPreconditioner
 
 include("EFAPFFHMCUpdater.jl")
-export EFAPFFHMCUpdater, hmc_update!
+export EFAPFFHMCUpdater
 
 end
