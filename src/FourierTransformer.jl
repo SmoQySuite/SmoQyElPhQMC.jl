@@ -42,7 +42,7 @@ function lmul!(
 ) where {T<:AbstractFloat}
     
     (; Lτ, N, θ, fft_plan!) = U
-    u = reshaped(v, Lτ, N)
+    u = (ndims(v)==2) ? v : reshaped(v, Lτ, N)
     @. u = θ/sqrt(Lτ) * u
     mul!(u, fft_plan!, u)
 
@@ -56,7 +56,7 @@ function ldiv!(
 ) where {T<:AbstractFloat}
     
     (; Lτ, N, θ, ifft_plan!) = U
-    u = reshaped(v, Lτ, N)
+    u = (ndims(v)==2) ? v : reshaped(v, Lτ, N)
     mul!(u, ifft_plan!, u)
     @. u = inv(θ)*sqrt(Lτ) * u
 

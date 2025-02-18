@@ -1,5 +1,5 @@
 @doc raw"""
-    AbstractFermionDetMatrix{T<:Number, E<:AbstractFloat}
+    FermionDetMatrix{T<:Number, E<:AbstractFloat}
 
 A abstract type to represent fermion determinant matrix
 ```
@@ -16,10 +16,10 @@ an inverse temperature ``\beta = \Delta\tau \cdot L_\tau``. A Fermion determinan
 will be ``N L_\tau \times N L_\tau``, where each propagator matrix ``B_l`` is ``N \times N``,
 where ``N`` is the number of orbitals in the lattice.
 """
-abstract type AbstractFermionDetMatrix{T<:Number, E<:AbstractFloat} end
+abstract type FermionDetMatrix{T<:Number, E<:AbstractFloat} end
 
 @doc raw"""
-    SymFermionDetMatrix{T<:Number, E<:AbstractFloat} <: AbstractFermionDetMatrix{T,E}
+    SymFermionDetMatrix{T<:Number, E<:AbstractFloat} <: FermionDetMatrix{T,E}
 
 A type to represent fermion determinant matrix
 ```
@@ -41,7 +41,7 @@ will be ``N L_\tau \times N L_\tau``, where each propagator matrix ``B_l`` is ``
 where ``N`` is the number of orbitals in the lattice. Here the matrix ``e^{-\Delta\tau K_l/2}`` is not Hermitian
 as it is approximated using the checkerboard approximation.
 """
-struct SymFermionDetMatrix{T<:Number, E<:AbstractFloat} <: AbstractFermionDetMatrix{T,E}
+struct SymFermionDetMatrix{T<:Number, E<:AbstractFloat} <: FermionDetMatrix{T,E}
 
     expnΔτV::Matrix{E}
     coshΔτt::Matrix{T}
@@ -103,7 +103,7 @@ end
 
 
 @doc raw"""
-    AsymFermionDetMatrix{T<:Number, E<:AbstractFloat} <: AbstractFermionDetMatrix{T, E}
+    AsymFermionDetMatrix{T<:Number, E<:AbstractFloat} <: FermionDetMatrix{T, E}
 
 A type to represent fermion determinant matrix
 ```
@@ -125,7 +125,7 @@ will be ``N L_\tau \times N L_\tau``, where each propagator matrix ``B_l`` is ``
 where ``N`` is the number of orbitals in the lattice. Note that``e^{-\Delta\tau K_l}`` is
 represented using the checkerboard approximation.
 """
-struct AsymFermionDetMatrix{T<:Number, E<:AbstractFloat} <: AbstractFermionDetMatrix{T,E}
+struct AsymFermionDetMatrix{T<:Number, E<:AbstractFloat} <: FermionDetMatrix{T,E}
 
     expnΔτV::Matrix{E}
     coshΔτt::Matrix{T}
@@ -188,7 +188,7 @@ end
 
 # udpate fermion determinant matrix to reflect fermion path integral
 function update!(
-    fdm::AbstractFermionDetMatrix{T, E},
+    fdm::FermionDetMatrix{T, E},
     fpi::FermionPathIntegral{T, E}
 ) where {T<:Number, E<:AbstractFloat}
 
@@ -217,17 +217,17 @@ end
 
 
 # return matrix element type of fermion determinant matrix
-eltype(fdm::AbstractFermionDetMatrix{T}) where {T} = T
+eltype(fdm::FermionDetMatrix{T}) where {T} = T
 
 # return size of fermion determinant matrix
-size(fdm::AbstractFermionDetMatrix) = (length(fdm.expnΔτV), length(fdm.expnΔτV))
-size(fdm::AbstractFermionDetMatrix, dim::Int) = length(fdm.expnΔτV)
+size(fdm::FermionDetMatrix) = (length(fdm.expnΔτV), length(fdm.expnΔτV))
+size(fdm::FermionDetMatrix, dim::Int) = length(fdm.expnΔτV)
 
 
 # evaluate v′ = [Mᵀ⋅M]⁻¹⋅v
 function ldiv!(
     v′::AbstractVecOrMat{Complex{E}},
-    fdm::AbstractFermionDetMatrix{T, E},
+    fdm::FermionDetMatrix{T, E},
     v::AbstractVecOrMat{Complex{E}};
     preconditioner = I,
     rng::AbstractRNG = Random.default_rng(),
@@ -237,14 +237,18 @@ function ldiv!(
 
     (; cgs) = fdm
     update_preconditioner!(preconditioner, fdm, rng)
-    iters, ϵ = cg_solve!(v′, fdm, v, cgs, preconditioner, maxiter = maxiter, tol = tol)
+    iters, ϵ = cg_solve!(
+        v′, fdm, v, cgs, preconditioner,
+        maxiter = maxiter,
+        tol = tol
+    )
 
     return iters, ϵ
 end
 
 # evaluate v = [Mᵀ⋅M]⁻¹⋅v
 function ldiv!(
-    fdm::AbstractFermionDetMatrix{T, E},
+    fdm::FermionDetMatrix{T, E},
     v::AbstractVecOrMat{Complex{E}};
     preconditioner = I,
     maxiter::Int = fdm.cgs.maxiter,
@@ -266,7 +270,7 @@ end
 
 # evaluate v = Mᵀ⋅M⋅v
 function lmul!(
-    fdm::AbstractFermionDetMatrix,
+    fdm::FermionDetMatrix,
     v::AbstractVecOrMat
 )
 
@@ -279,7 +283,7 @@ end
 # evaluate v′ = Mᵀ⋅M⋅v
 function mul!(
     v′::AbstractVecOrMat,
-    fdm::AbstractFermionDetMatrix,
+    fdm::FermionDetMatrix,
     v::AbstractVecOrMat
 )
 
@@ -291,7 +295,7 @@ end
 
 # evaluate v = Mᵀ⋅M⋅v
 function lmul_MtM!(
-    fdm::AbstractFermionDetMatrix,
+    fdm::FermionDetMatrix,
     v::AbstractVecOrMat
 )
 
@@ -304,7 +308,7 @@ end
 # evaluate v′ = Mᵀ⋅M⋅v
 function mul_MtM!(
     v′::AbstractVecOrMat,
-    fdm::AbstractFermionDetMatrix,
+    fdm::FermionDetMatrix,
     v::AbstractVecOrMat
 )
 
@@ -318,7 +322,7 @@ end
 
 # evaluate v = M⋅Mᵀ⋅v
 function lmul_MMt!(
-    fdm::AbstractFermionDetMatrix,
+    fdm::FermionDetMatrix,
     v::AbstractVecOrMat
 )
 
@@ -332,7 +336,7 @@ end
 # evaluate v′ = M⋅Mᵀ⋅v
 function mul_MMt!(
     v′::AbstractVecOrMat,
-    fdm::AbstractFermionDetMatrix,
+    fdm::FermionDetMatrix,
     v::AbstractVecOrMat
 )
 
@@ -346,7 +350,7 @@ end
 
 # evaluate v = M⋅v
 function lmul_M!(
-    fdm::AbstractFermionDetMatrix,
+    fdm::FermionDetMatrix,
     v::AbstractVecOrMat
 )
 
@@ -444,7 +448,7 @@ end
 
 # evaluate v = M⋅v
 function lmul_Mt!(
-    fdm::AbstractFermionDetMatrix,
+    fdm::FermionDetMatrix,
     v::AbstractVecOrMat
 )
 

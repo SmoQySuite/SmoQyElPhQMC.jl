@@ -39,7 +39,7 @@ function checkerboard_lmul!(
     N = length(v) ÷ Lτ
 
     # reshaped if vector to matrix
-    u = reshaped(v, Lτ, N)
+    u = (ndims(v) == 2) ? v : reshaped(v, (Lτ, N))
 
     # if transposed, then reverse the order the hoppings are iterated over
     if transposed
@@ -109,7 +109,7 @@ function checkerboard_ldiv!(
     N = length(v) ÷ Lτ
 
     # reshaped if vector to matrix
-    u = reshaped(v, Lτ, N)
+    u = (ndims(v) == 2) ? v : reshaped(v, (Lτ, N))
 
     # if not transposed, then reverse the order the hoppings are iterated over
     if !transposed

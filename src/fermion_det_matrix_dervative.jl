@@ -196,7 +196,7 @@ function _mul_νReΔτ∂Kc∂x!(
     ν::E,
     u′::AbstractMatrix,
     v′::AbstractMatrix,
-    fdm::AbstractFermionDetMatrix{T,E},
+    fdm::FermionDetMatrix{T,E},
     elph::ElectronPhononParameters{T,E},
     Δτ::E,
     color::Int

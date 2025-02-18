@@ -2,12 +2,12 @@ using LinearAlgebra
 using Random
 using Printf
 
-using  SmoQyElPhQMC
 using  SmoQyDQMC
 import SmoQyDQMC.LatticeUtilities  as lu
 import SmoQyDQMC.JDQMCFramework    as dqmcf
 import SmoQyDQMC.JDQMCMeasurements as dqmcm
 import SmoQyDQMC.MuTuner           as mt
+using  SmoQyElPhQMC
 
 # Define top-level function for running the DQMC simulation.
 function run_holstein_chain_simulation(sID, Ω, α, μ, β, L, N_burnin, N_updates, N_bins; filepath = ".")

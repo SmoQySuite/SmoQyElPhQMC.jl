@@ -1,8 +1,64 @@
-# abstract type to represent KPM expansion
-abstract type AbstractKPMPreconditioner{T<:Number, E<:AbstractFloat} end
+@doc raw"""
+    abstract type KPMPreconditioner{T<:Number, E<:AbstractFloat} end
 
-# KPM preconditioner when fermion determinant matrix is defined using symmetric propagator matrices
-mutable struct SymKPMPreconditioner{T, E, Tfft, Tifft} <: AbstractKPMPreconditioner{T, E}
+Abstract type representing the KPM preconditioner appearing in the left-preconditioned linear system
+```
+P^{-1} \cdot \left[ M^{\dagger} M^{\phantom\dagger} \right] \cdot x = P^{-1} \cdot b
+```
+that is solved for using the Conjugate Gradient method, where ``M`` is the fermion determinant matrix.
+Here, a KPM preconditioner represents
+```
+P^{-1} = \left[ \bar{M}^{\dagger} \bar{M}^{\phantom\dagger} \right]^{-1}
+```
+with a Chebyshev expansion in powers of
+```
+\bar{B} = \frac{1}{L_\tau} \sum_{l=0}^{L_\tau-1} B_l,
+```
+where
+```
+\bar{M} = \left(\begin{array}{ccccc}
+    I &  &  &  & \bar{B}\\
+    -\bar{B} & I\\
+    & -\bar{B} & \ddots\\
+    &  & \ddots & \ddots\\
+    &  &  & -\bar{B} & I
+\end{array}\right).
+```
+"""
+abstract type KPMPreconditioner{T<:Number, E<:AbstractFloat} end
+
+@doc raw"""
+    mutable struct SymKPMPreconditioner{T, E, Tfft, Tifft} <: KPMPreconditioner{T, E}
+
+Type representing the KPM preconditioner appearing in the left-preconditioned linear system
+```
+P^{-1} \cdot \left[ M^{\dagger} M^{\phantom\dagger} \right] \cdot x = P^{-1} \cdot b
+```
+that is solved for using the Conjugate Gradient method, where ``M`` is the fermion determinant matrix
+defined using the symmetric propagator definition
+```
+B_l = e^{-\Delta\tau K_l/2} e^{-\Delta\tau V_l} e^{-\Delta\tau K_l/2}.
+```
+Here, a KPM preconditioner represents
+```
+P^{-1} = \left[ \bar{M}^{\dagger} \bar{M}^{\phantom\dagger} \right]^{-1}
+```
+with a Chebyshev expansion in powers of
+```
+\bar{B} = \frac{1}{L_\tau} \sum_{l=0}^{L_\tau-1} B_l,
+```
+where
+```
+\bar{M} = \left(\begin{array}{ccccc}
+    I &  &  &  & \bar{B}\\
+    -\bar{B} & I\\
+    & -\bar{B} & \ddots\\
+    &  & \ddots & \ddots\\
+    &  &  & -\bar{B} & I
+\end{array}\right).
+```
+"""
+mutable struct SymKPMPreconditioner{T, E, Tfft, Tifft} <: KPMPreconditioner{T, E}
 
     # whether preconditioner is active or not
     active::Bool
@@ -42,8 +98,38 @@ mutable struct SymKPMPreconditioner{T, E, Tfft, Tifft} <: AbstractKPMPreconditio
     v′::Matrix{Complex{E}}
 end
 
-# KPM preconditioner when fermion determinant matrix is defined using asymmetric propagator matrices
-mutable struct AsymKPMPreconditioner{T, E, Tfft, Tifft} <: AbstractKPMPreconditioner{T, E}
+@doc raw"""
+    mutable struct AsymKPMPreconditioner{T, E, Tfft, Tifft} <: KPMPreconditioner{T, E}
+
+Type representing the KPM preconditioner appearing in the left-preconditioned linear system
+```
+P^{-1} \cdot \left[ M^{\dagger} M^{\phantom\dagger} \right] \cdot x = P^{-1} \cdot b
+```
+that is solved for using the Conjugate Gradient method, where ``M`` is the fermion determinant matrix
+defined using the asymmetric propagator definition
+```
+B_l = e^{-\Delta\tau V_l} e^{-\Delta\tau K_l}.
+```
+Here, a KPM preconditioner represents
+```
+P^{-1} = \left[ \bar{M}^{\dagger} \bar{M}^{\phantom\dagger} \right]^{-1}
+```
+with a Chebyshev expansion in powers of
+```
+\bar{B} = \frac{1}{L_\tau} \sum_{l=0}^{L_\tau-1} B_l,
+```
+where
+```
+\bar{M} = \left(\begin{array}{ccccc}
+    I &  &  &  & \bar{B}\\
+    -\bar{B} & I\\
+    & -\bar{B} & \ddots\\
+    &  & \ddots & \ddots\\
+    &  &  & -\bar{B} & I
+\end{array}\right).
+```
+"""
+mutable struct AsymKPMPreconditioner{T, E, Tfft, Tifft} <: KPMPreconditioner{T, E}
 
     # whether preconditioner is active or not
     active::Bool
@@ -83,10 +169,36 @@ mutable struct AsymKPMPreconditioner{T, E, Tfft, Tifft} <: AbstractKPMPreconditi
     v′::Matrix{Complex{E}}
 end
 
-# initialize a KPM preconditioner
+
+@doc raw"""
+    KPMPreconditioner(
+        fdm::FermionDetMatrix{T};
+        # Keyword Arguments
+        rng::AbstractRNG = Random.default_rng(),
+        rbuf::E = 0.10,
+        n::Int = 20,
+        a1::E = 1.0,
+        a2::E = 1.0
+    ) where {T<:Number, E<:AbstractFloat}
+
+Initialize and return an instance of either the [`SymKPMPreconditioner`](@ref) or [`AsymKPMPreconditioner`](@ref) type.
+
+# Arguments
+
+- `fdm::FermionDetMatrix{T}`: Fermion determinant matrix.
+
+# Keyword Arguments
+
+- `rng::AbstractRNG = Random.default_rng()`: Random number generator.
+- `rbuf::E = 0.10`: Relative buffer applied to eigevalue bounds of ``\bar{B}`` calculated by Lanczos.
+- `n::Int = 20`: Number of lanczos iterations used to approximate eigenvalue bounds.
+- `a1::E = 1.0`: Controls maximum order of kpm expansion.
+- `a2::E = 1.0`: Controls minimum order of kpm expansion.
+"""
 function KPMPreconditioner(
-    fdm::AbstractFermionDetMatrix{T},
-    rng::AbstractRNG;
+    fdm::FermionDetMatrix{T};
+    # Keyword Arguments
+    rng::AbstractRNG = Random.default_rng(),
     rbuf::E = 0.10,
     n::Int = 20,
     a1::E = 1.0,
@@ -438,8 +550,8 @@ end
 
 # update KPM preconditioner to reflect fermion determinant matrix
 function update_preconditioner!(
-    Pkpm::AbstractKPMPreconditioner,
-    fdm::AbstractFermionDetMatrix,
+    Pkpm::KPMPreconditioner,
+    fdm::FermionDetMatrix,
     rng::AbstractRNG
 )
 
@@ -566,7 +678,7 @@ end
 
 # update KPM expansion order and coefficients
 function update_kpm_expansions!(
-    Pkpm::AbstractKPMPreconditioner
+    Pkpm::KPMPreconditioner
 )
 
     # update KPM expansion order
@@ -580,7 +692,7 @@ end
 
 # update KPM expansion order
 function update_kpm_expansion_order!(
-    Pkpm::AbstractKPMPreconditioner
+    Pkpm::KPMPreconditioner
 )
 
     (; a1, a2, bounds, ϕs, order, coefs, buf) = Pkpm

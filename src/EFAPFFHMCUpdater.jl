@@ -1,3 +1,11 @@
+@doc raw"""
+    struct EFAPFFHMCUpdater{T<:AbstractFloat, PFFT, PIFFT}
+
+Type to define how to perform an Hybrid/Hamiltonian Monte Carlo (HMC) updates of the
+phonon fields using a fermionic action formulated by introducing a complex pseudofermion
+field (PFF) `\Phi`. Exact Fourier Acceleration (EFA) is also used to more efficiently sample the
+phonon fields.
+"""
 struct EFAPFFHMCUpdater{T<:AbstractFloat, PFFT, PIFFT}
 
     Nt::Int
@@ -14,10 +22,32 @@ struct EFAPFFHMCUpdater{T<:AbstractFloat, PFFT, PIFFT}
     efa::SmoQyDQMC.ExactFourierAccelerator{T, PFFT, PIFFT}
 end
 
+
+@doc raw"""
+    EFAPFFHMCUpdater(;
+        # Keyword Arguments
+        electron_phonon_parameters::ElectronPhononParameters{T},
+        fermion_det_matrix::FermionDetMatrix{T},
+        Nt::Int,
+        Δt::E,
+        η::E = 0.0,
+        δ::E = 0.05
+    ) where {T<:Number, E<:AbstractFloat}
+
+Initialize an instance of [`EFAPFFHMCUpdater`](@ref) type, defining an EFA-PFF-HMC update.
+
+# Keyword Arguments
+- `electron_phonon_parameters::ElectronPhononParameters{T}`: Parameters defining the electron-phonon model.
+- `fermion_det_matrix::FermionDetMatrix{T}`: Fermion determinant matrix.
+- `Nt::Int`: Number of HMC time-steps.
+- `Δt::E`: Time-step for HMC update.
+- `η::E = 0.0`: Regularization parameter for EFA.
+- `δ::E = 0.05`: Fractional noise to add to the time-step `Δt`.
+"""
 function EFAPFFHMCUpdater(;
-    # KEYWORD ARGUMENTS
+    # Keyword Arguments
     electron_phonon_parameters::ElectronPhononParameters{T},
-    fermion_det_matrix::AbstractFermionDetMatrix{T},
+    fermion_det_matrix::FermionDetMatrix{T},
     Nt::Int,
     Δt::E,
     η::E = 0.0,
@@ -54,12 +84,27 @@ function EFAPFFHMCUpdater(;
 end
 
 
-# Perform HMC update
+@doc raw"""
+    hmc_update!(
+        electron_phonon_parameters::ElectronPhononParameters{T,E},
+        hmc_updater::EFAPFFHMCUpdater{E};
+        fermion_path_integral::FermionPathIntegral{T,E},
+        fermion_det_matrix::FermionDetMatrix{T,E},
+        rng::AbstractRNG,
+        recenter!::Function = identity,
+        Nt::Int = hmc_updater.Nt,
+        Δt::E = hmc_updater.Δt,
+        δ::E = hmc_updater.δ,
+        preconditioner = I
+    ) where {T, E}
+
+Perform an EFA-PFF-HMC update to the phonon fields.
+"""
 function hmc_update!(
     electron_phonon_parameters::ElectronPhononParameters{T,E},
     hmc_updater::EFAPFFHMCUpdater{E};
     fermion_path_integral::FermionPathIntegral{T,E},
-    fermion_det_matrix::AbstractFermionDetMatrix{T,E},
+    fermion_det_matrix::FermionDetMatrix{T,E},
     rng::AbstractRNG,
     recenter!::Function = identity,
     Nt::Int = hmc_updater.Nt,
@@ -181,7 +226,7 @@ end
 # sample the pseudofermion field as Φ = Aᵀ⋅R = Λᵀ⋅Mᵀ⋅R
 function sample_Φ!(
     Φ::AbstractMatrix{Complex{E}},
-    fdm::AbstractFermionDetMatrix{T},
+    fdm::FermionDetMatrix{T},
     Λ::AbstractMatrix{E},
     rng::AbstractRNG
 ) where {T<:Number, E<:AbstractFloat}
@@ -204,7 +249,7 @@ function calculate_∂Sf∂x!(
     ∂Sf∂x::AbstractMatrix{E},
     Φ::AbstractMatrix{Complex{E}},
     Λ::AbstractMatrix{E},
-    fdm::AbstractFermionDetMatrix{T},
+    fdm::FermionDetMatrix{T},
     elph::ElectronPhononParameters{T,E},
     P,
     rng::AbstractRNG,
@@ -241,7 +286,7 @@ function calculate_Ψ!(
     Ψ::AbstractVecOrMat{Complex{E}},
     Φ::AbstractVecOrMat{Complex{E}},
     Λ::AbstractMatrix{E},
-    MᵀM::AbstractFermionDetMatrix{T},
+    MᵀM::FermionDetMatrix{T},
     preconditioner,
     rng::AbstractRNG;
     power::E = 1
