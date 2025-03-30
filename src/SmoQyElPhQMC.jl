@@ -7,6 +7,7 @@ using Random
 using Statistics
 using ShiftedArrays
 using CircularArrays
+using StaticArrays
 
 
 # Reshapes with zero allocations, returns an instance of Base.ReshapedArray.
@@ -38,9 +39,7 @@ import LinearAlgebra: mul!, lmul!, ldiv!
 
 # import SmoQyDQMC
 using SmoQyDQMC
-
-# import function to extend from SmoQyDQMC
-import SmoQyDQMC: hmc_update!
+import SmoQyDQMC: HolsteinParameters, SSHParameters, DispersionParameters
 
 # using SmoQyKPMCore for preconditioner
 using SmoQyKPMCore
@@ -62,6 +61,7 @@ include("FourierTransformer.jl")
 include("KPMPreconditioner.jl")
 export KPMPreconditioner, SymKPMPreconditioner, AsymKPMPreconditioner
 
+import SmoQyDQMC: hmc_update!
 include("EFAPFFHMCUpdater.jl")
 export EFAPFFHMCUpdater
 
@@ -73,7 +73,15 @@ include("Measurements/scalar_measurements.jl")
 import SmoQyDQMC: measure_onsite_energy, measure_hopping_energy, measure_bare_hopping_energy
 include("Measurements/tight_binding_measurements.jl")
 
-import SmoQyDQMC: make_measurements!
+import SmoQyDQMC: measure_holstein_energy, measure_ssh_energy
+include("Measurements/electron_phonon_measurements.jl")
+
+import SmoQyDQMC: make_measurements!, CorrelationContainer, CompositeCorrelationContainer
+include("Measurements/Correlations/density.jl")
+include("Measurements/Correlations/pair.jl")
+include("Measurements/Correlations/spin.jl")
+include("Measurements/Correlations/bond.jl")
+include("Measurements/Correlations/current.jl")
 include("Measurements/make_measurements.jl")
 
 end

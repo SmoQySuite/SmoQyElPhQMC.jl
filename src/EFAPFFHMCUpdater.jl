@@ -292,14 +292,14 @@ function calculate_Ψ!(
     power::E = 1
 ) where {T<:Number, E<:AbstractFloat}
 
-    tol = MᵀM.cgs.tol^power
+    tol = MᵀM.cgs.tol
     # Ψ = Λ⁻ᵀ⋅Φ
     ldiv_Λᵀ!(Ψ, Λ, Φ)
     # Ψ = [Mᵀ⋅M]⁻¹⋅Λ⁻ᵀ⋅Φ
     # EXPENSIVE PART, AS REQUIRES CONJUGATE GRADIENT SOLVE!!!
     iters, ϵ = ldiv!(
         Ψ, MᵀM, Ψ,
-        tol = tol,
+        tol = tol^power,
         preconditioner = preconditioner,
         rng = rng,
     )
@@ -307,7 +307,7 @@ function calculate_Ψ!(
     ldiv_Λ!(Ψ, Λ, Ψ)
     # Sf = Φᵀ⋅Ψ = Φᵀ⋅[Aᵀ⋅A]⁻¹⋅Φ
     Sf = dot(Φ,Ψ)
-    @assert abs(1e-6 * real(Sf)) > abs(imag(Sf)) "Complex Fermionic Action, Sf = $Sf"
+    @assert 10*tol > abs(imag(Sf)/real(Sf)) "Complex Fermionic Action, Sf = $Sf"
 
     return real(Sf), iters, ϵ
 end

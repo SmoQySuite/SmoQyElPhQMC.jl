@@ -33,7 +33,7 @@ function run_holstein_chain_simulation(sID, Ω, α, μ, β, L, N_burnin, N_updat
     Δτ = 0.05
 
     # Tolerance for CG solves.
-    tol = 1e-6
+    tol = 1e-7
 
     # Max iterations for CG solve.
     maxiter = 10_000
@@ -42,10 +42,10 @@ function run_holstein_chain_simulation(sID, Ω, α, μ, β, L, N_burnin, N_updat
     bin_size = div(N_updates, N_bins)
 
     # Number of fermionic time-steps in HMC update.
-    Nt = 4
+    Nt = 100
 
     # Fermionic time-step used in HMC update.
-    Δt = π/(2*Ω)/(10*Nt)
+    Δt = π/(2*Ω*Nt)
 
     # Initialize a dictionary to store additional information about the simulation.
     additional_info = Dict(
@@ -54,6 +54,7 @@ function run_holstein_chain_simulation(sID, Ω, α, μ, β, L, N_burnin, N_updat
         "N_bins" => N_bins,
         "bin_size" => bin_size,
         "hmc_acceptance_rate" => 0.0,
+        "cg_iters" => 0.0,
         "Nt" => Nt,
         "dt" => Δt,
         "tol" => tol,
@@ -159,6 +160,25 @@ function run_holstein_chain_simulation(sID, Ω, α, μ, β, L, N_burnin, N_updat
         rng = rng
     )
 
+    ##############################
+    ### INITIALIZE MEASUREMENTS ##
+    ##############################
+
+    ## Initialize the container that measurements will be accumulated into.
+    measurement_container = initialize_measurement_container(model_geometry, β, Δτ)
+
+    ## Initialize the tight-binding model related measurements, like the hopping energy.
+    initialize_measurements!(measurement_container, tight_binding_model)
+
+    ## Initialize the electron-phonon interaction related measurements.
+    initialize_measurements!(measurement_container, electron_phonon_model)
+
+    # Initialize the sub-directories to which the various measurements will be written.
+    initialize_measurement_directories(
+        simulation_info = simulation_info,
+        measurement_container = measurement_container
+    )
+
     ############################
     ### SET-UP QMC SIMULATION ##
     ############################
@@ -172,14 +192,28 @@ function run_holstein_chain_simulation(sID, Ω, α, μ, β, L, N_burnin, N_updat
     # Initialize fermion determinant matrix.
     fermion_det_matrix = AsymFermionDetMatrix(fermion_path_integral)
 
+    # Initilialize KPM Preconditioner.
+    kpm_preconditioner = KPMPreconditioner(
+        fermion_det_matrix,
+        rng = rng,
+        rbuf = 0.10,
+        n = 20
+    )
+
+    # Initialize the Green's function estimator.
+    greens_estimator = GreensEstimator(
+        fermion_det_matrix, model_geometry,
+        Nrv = 10,
+        preconditioner = kpm_preconditioner,
+        rng = rng
+    )
+
     # Initialize Hamitlonian/Hybrid monte carlo (HMC) updater.
     hmc_updater = EFAPFFHMCUpdater(
         electron_phonon_parameters = electron_phonon_parameters,
         fermion_det_matrix = fermion_det_matrix,
         Nt = Nt,
-        Δt = Δt,
-        tol = tol,
-        maxiter = maxiter
+        Δt = Δt
     )
 
     ####################################
@@ -190,16 +224,19 @@ function run_holstein_chain_simulation(sID, Ω, α, μ, β, L, N_burnin, N_updat
     for n in 1:N_burnin
 
         # Perform an HMC update.
-        accepted = hmc_update!(
-            electron_phonon_parameters,
-            hmc_updater,
+        accepted, iters_avg = hmc_update!(
+            electron_phonon_parameters, hmc_updater,
             fermion_path_integral = fermion_path_integral,
             fermion_det_matrix = fermion_det_matrix,
-            rng = rng
+            rng = rng,
+            preconditioner = kpm_preconditioner
         )
 
         # Record whether the HMC update was accepted or rejected.
         additional_info["hmc_acceptance_rate"] += accepted
+
+        # Record average number of CG iterations.
+        additional_info["cg_iters"] += iters_avg
     end
 
     ################################
@@ -213,24 +250,61 @@ function run_holstein_chain_simulation(sID, Ω, α, μ, β, L, N_burnin, N_updat
         for n in 1:bin_size
 
             # Perform an HMC update.
-            accepted = hmc_update!(
-                electron_phonon_parameters,
-                hmc_updater,
+            accepted, iters_avg = hmc_update!(
+                electron_phonon_parameters, hmc_updater,
                 fermion_path_integral = fermion_path_integral,
                 fermion_det_matrix = fermion_det_matrix,
-                rng = rng
+                rng = rng,
+                preconditioner = kpm_preconditioner
             )
 
             # Record whether the HMC update was accepted or rejected.
             additional_info["hmc_acceptance_rate"] += accepted
+
+            # Record average number of CG iterations.
+            additional_info["cg_iters"] += iters_avg
+
+            # Make measurements.
+            make_measurements!(
+                measurement_container,
+                fermion_det_matrix,
+                greens_estimator,
+                model_geometry = model_geometry,
+                fermion_path_integral = fermion_path_integral,
+                tight_binding_parameters = tight_binding_parameters,
+                electron_phonon_parameters = electron_phonon_parameters,
+                preconditioner = kpm_preconditioner,
+                rng = rng
+            )
         end
+
+        ## Write the average measurements for the current bin to file.
+        write_measurements!(
+            measurement_container = measurement_container,
+            simulation_info = simulation_info,
+            model_geometry = model_geometry,
+            bin = bin,
+            bin_size = bin_size,
+            Δτ = Δτ
+        )
     end
 
     # Calculate HMC acceptance rate.
     additional_info["hmc_acceptance_rate"] /= (N_updates + N_burnin)
 
+    # Calculate average number of CG iterations.
+    additional_info["cg_iters"] /= (N_updates + N_burnin)
+
     # Write simulation summary TOML file.
     save_simulation_info(simulation_info, additional_info)
+
+    #################################
+    ### PROCESS SIMULATION RESULTS ##
+    #################################
+
+    ## Process the simulation results, calculating final error bars for all measurements,
+    ## writing final statisitics to CSV files.
+    process_measurements(simulation_info.datafolder, N_bins)
 
     return nothing
 end
