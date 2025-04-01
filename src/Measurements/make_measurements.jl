@@ -1,11 +1,23 @@
 @doc raw"""
-Make measurements, including time-displaced correlation and zero Matsubara frequency measurements.
-This method also returns `(logdetG, sgndetG, δG, δθ)`.
+    make_measurements!(
+        measurement_container::NamedTuple,
+        fermion_det_matrix::FermionDetMatrix{T,E},
+        greens_estimator::GreensEstimator{E,D};
+        # Keyword Arguments Start Here
+        model_geometry::ModelGeometry{D,E},
+        fermion_path_integral::FermionPathIntegral{T,E},
+        tight_binding_parameters::TightBindingParameters{T,E},
+        electron_phonon_parameters::ElectronPhononParameters{T,E},
+        preconditioner = I,
+        rng::AbstractRNG = Random.default_rng()
+    ) where {T<:Number, E<:AbstractFloat, D}
+
+Make all measurements.
 """
 function make_measurements!(
     measurement_container::NamedTuple,
     fermion_det_matrix::FermionDetMatrix{T,E},
-    greens_estimator::GreensEstimator{E, D};
+    greens_estimator::GreensEstimator{E,D};
     # Keyword Arguments Start Here
     model_geometry::ModelGeometry{D,E},
     fermion_path_integral::FermionPathIntegral{T,E},

@@ -52,28 +52,42 @@ include("IterativeSolvers/ConjugateGradient.jl")
 # implement function for perform in-place checkerboard matrix-vector multiply
 include("checkerboard_matrix_multiply.jl")
 
+# define types for representing fermion determinant matrix
 include("FermionDetMatrix.jl")
 export FermionDetMatrix, SymFermionDetMatrix, AsymFermionDetMatrix
 
+# Define the holstein shift matrix that transform Λ that transforms the
+# fermion determinant matrix to M → M⋅Λ that arrises as a result of parameterizing
+# the holstein interaction g⋅X⋅(n-1).
+# See Phys. Rev. E 105, 065302 for more information.
 include("holstein_shift_matrix.jl")
 
+# methods for calculating ⟨u|∂M/∂x|v⟩ where ∂M/∂x is the derivative of the fermion determinant matrix
 include("fermion_det_matrix_dervative.jl")
 
+# type to apply unitary transformation to fermion determinant matrix to go from
+# imaginary time to frequency basis
 include("FourierTransformer.jl")
 
+# KPM based preconditioner to accelerate conjugate gradient solves
 include("KPMPreconditioner.jl")
 export KPMPreconditioner, SymKPMPreconditioner, AsymKPMPreconditioner
 
+# For performing HMC udpates to phonon fields that use exact fourier acceleration (EFA)
+# to improve sampling
 import SmoQyDQMC: hmc_update!
 include("EFAPFFHMCUpdater.jl")
 export EFAPFFHMCUpdater
 
+# perform linear scaling reflection update to phonon fields
 import SmoQyDQMC: reflection_update!
 include("reflection_update.jl")
 
+# perform linear scaling swap update to phonon fields
 import SmoQyDQMC: swap_update!
 include("swap_update.jl")
 
+# type of estimate Green's function and Green's function Wick's contractions
 include("Measurements/GreensEstimator.jl")
 export GreensEstimator
 
@@ -92,5 +106,8 @@ include("Measurements/Correlations/spin.jl")
 include("Measurements/Correlations/bond.jl")
 include("Measurements/Correlations/current.jl")
 include("Measurements/make_measurements.jl")
+
+import SmoQyDQMC: update_chemical_potential!
+include("update_chemical_potential.jl")
 
 end
