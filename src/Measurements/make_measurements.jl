@@ -43,13 +43,29 @@ function make_measurements!(
         greens_estimator,
     )
 
-    # make euqal-time and time-displaced measurements
+    # make equal-time and time-displaced measurements
     make_correlation_measurements!(
         measurement_container,
         greens_estimator,
         model_geometry,
         tight_binding_parameters,
         fermion_path_integral
+    )
+
+    # make equal-time and time-displaced composite measurements
+    make_composite_correlation_measurements!(
+        measurement_container,
+        greens_estimator,
+        model_geometry,
+        tight_binding_parameters,
+        fermion_path_integral
+    )
+
+    # make phonon green's function related correlation measurements
+    make_phonon_greens_measurements!(
+        measurement_container,
+        model_geometry,
+        electron_phonon_parameters,
     )
 
     return nothing
@@ -137,7 +153,7 @@ function make_correlation_measurements!(
     fermion_path_integral::FermionPathIntegral{T,E}
 ) where {D, E<:AbstractFloat, T<:Number}
 
-    # get defined bonds on model geometry
+    
     bonds = model_geometry.bonds::Vector{Bond{D}}
 
     # get dimensions of lattice
@@ -161,7 +177,7 @@ function make_correlation_measurements!(
     for correlation in measurements
 
         # get the relevant id pairs for current correlation measurement
-        id_pairs = get_id_pairs(equaltime_correlations, time_displaced_correlations, correlation)
+        id_pairs = get_correlation_id_pairs(equaltime_correlations, time_displaced_correlations, correlation)
 
         if (correlation == "greens") || (correlation == "greens_up") || (correlation == "greens_dn")
 
@@ -360,8 +376,399 @@ function make_correlation_measurements!(
 end
 
 
-# get the id pairs associated with correlation measurements
-function get_id_pairs(
+# make composite correlation measurements
+function make_composite_correlation_measurements!(
+    measurement_container::NamedTuple,
+    greens_estimator::GreensEstimator{E},
+    model_geometry::ModelGeometry{D,E},
+    tight_binding_parameters::TightBindingParameters{T,E},
+    fermion_path_integral::FermionPathIntegral{T,E}
+) where {D, E<:AbstractFloat, T<:Number}
+
+    (; unit_cell, lattice, bonds) = model_geometry
+
+    # get dimensions of lattice
+    L = lattice.L
+
+    # get length of imaginary time axis
+    Lτ = fermion_path_integral.Lτ
+
+    # get correlation containers
+    (; time_displaced_composite_correlations, equaltime_composite_correlations) = measurement_container
+
+    # get temporarary correlation container
+    tmp = greens_estimator.tmp
+
+    # get all correlation measurements
+    equaltime_measurements = keys(equaltime_composite_correlations)
+    time_displaced_measurements = keys(time_displaced_composite_correlations)
+    measurements = union(equaltime_measurements, time_displaced_measurements)
+
+    # iterate over composite correlation measurements
+    for measurement in measurements
+
+        # get the type of correlation measurement that will need to be made
+        correlation = get_composite_correlation_type(
+            equaltime_composite_correlations,
+            time_displaced_composite_correlations,
+            measurement
+        
+        )
+
+        # get the ids associated with the composite correlation measurement
+        ids = get_composite_correlation_ids(
+            equaltime_composite_correlations,
+            time_displaced_composite_correlations,
+            measurement
+        )
+
+        # get composite correlation coefficients
+        coefficients = get_composite_correlation_coefficients(
+            equaltime_composite_correlations,
+            time_displaced_composite_correlations,
+            measurement
+        )
+
+        if (correlation == "greens") || (correlation == "greens_up") || (correlation == "greens_dn")
+
+            for j in eachindex(ids)
+                for i in eachindex(ids)
+                    fill!(tmp, 0)
+                    measure_GΔ0!(tmp, greens_estimator, (ids[j], ids[i]))
+                    @. tmp *= conj(coefficients[i]) * coefficients[j]
+                    copyto_composite_correlation_container!(
+                        equaltime_composite_correlations,
+                        time_displaced_composite_correlations,
+                        measurement, tmp,
+                        unit_cell, lattice,
+                        ids[i], ids[j]
+                    )
+                end
+            end 
+
+        elseif (correlation == "density_upup") || (correlation == "density_dndn")
+
+            for j in eachindex(ids)
+                for i in eachindex(ids)
+                    fill!(tmp, 0)
+                    coef = conj(coefficients[i]) * coefficients[j]
+                    measure_density_correlation!(tmp, greens_estimator, ids[i], ids[j], +1, +1, coef)
+                    @. tmp *= conj(coefficients[i]) * coefficients[j]
+                    copyto_composite_correlation_container!(
+                        equaltime_composite_correlations,
+                        time_displaced_composite_correlations,
+                        measurement, tmp,
+                        unit_cell, lattice,
+                        ids[i], ids[j]
+                    )
+                end
+            end
+
+        elseif (correlation == "density_updn") || (correlation == "density_dnup")
+
+            for j in eachindex(ids)
+                for i in eachindex(ids)
+                    fill!(tmp, 0)
+                    coef = conj(coefficients[i]) * coefficients[j]
+                    measure_density_correlation!(tmp, greens_estimator, ids[i], ids[j], +1, -1, coef)
+                    @. tmp *= conj(coefficients[i]) * coefficients[j]
+                    copyto_composite_correlation_container!(
+                        equaltime_composite_correlations,
+                        time_displaced_composite_correlations,
+                        measurement, tmp,
+                        unit_cell, lattice,
+                        ids[i], ids[j]
+                    )
+                end
+            end
+
+        elseif correlation == "density"
+
+            for j in eachindex(ids)
+                for i in eachindex(ids)
+                    fill!(tmp, 0)
+                    coef = conj(coefficients[i]) * coefficients[j]
+                    measure_density_correlation!(tmp, greens_estimator, ids[i], ids[j], coef)
+                    copyto_composite_correlation_container!(
+                        equaltime_composite_correlations,
+                        time_displaced_composite_correlations,
+                        measurement, tmp,
+                        unit_cell, lattice,
+                        ids[i], ids[j]
+                    )
+                end
+            end
+        
+        elseif correlation == "pair"
+
+            for j in eachindex(ids)
+                for i in eachindex(ids)
+                    fill!(tmp, 0)
+                    b″ = bonds[ids[j]]
+                    b′ = bonds[ids[i]]
+                    coef = conj(coefficients[i]) * coefficients[j]
+                    measure_pair_correlation!(tmp, greens_estimator, b′, b″, coef)
+                    copyto_composite_correlation_container!(
+                        equaltime_composite_correlations,
+                        time_displaced_composite_correlations,
+                        measurement, tmp,
+                        unit_cell, lattice,
+                        b′.orbitals[1], b″.orbitals[1]
+                    )
+                end
+            end
+
+        elseif (correlation == "spin_z") || (correlation == "spin_x")
+
+            for j in eachindex(ids)
+                for i in eachindex(ids)
+                    fill!(tmp, 0)
+                    coef = conj(coefficients[i]) * coefficients[j]
+                    measure_spin_correlation!(tmp, greens_estimator, ids[i], ids[j], coef)
+                    copyto_composite_correlation_container!(
+                        equaltime_composite_correlations,
+                        time_displaced_composite_correlations,
+                        measurement, tmp,
+                        unit_cell, lattice,
+                        ids[i], ids[j]
+                    )
+                end
+            end
+
+        elseif (correlation == "bond_upup") || (correlation == "bond_dndn")
+
+            for j in eachindex(ids)
+                for i in eachindex(ids)
+                    fill!(tmp, 0)
+                    b″ = bonds[ids[j]]
+                    b′ = bonds[ids[i]]
+                    coef = conj(coefficients[i]) * coefficients[j]
+                    measure_bond_correlation!(tmp, greens_estimator, b′, b″, +1, +1, coef)
+                    copyto_composite_correlation_container!(
+                        equaltime_composite_correlations,
+                        time_displaced_composite_correlations,
+                        measurement, tmp,
+                        unit_cell, lattice,
+                        b′.orbitals[1], b″.orbitals[1]
+                    )
+                end
+            end
+
+        elseif (correlation == "bond_updn") || (correlation == "bond_dnup")
+
+            for j in eachindex(ids)
+                for i in eachindex(ids)
+                    fill!(tmp, 0)
+                    b″ = bonds[ids[j]]
+                    b′ = bonds[ids[i]]
+                    coef = conj(coefficients[i]) * coefficients[j]
+                    measure_bond_correlation!(tmp, greens_estimator, b′, b″, +1, -1, coef)
+                    copyto_composite_correlation_container!(
+                        equaltime_composite_correlations,
+                        time_displaced_composite_correlations,
+                        measurement, tmp,
+                        unit_cell, lattice,
+                        b′.orbitals[1], b″.orbitals[1]
+                    )
+                end
+            end
+
+        elseif correlation == "bond"
+
+            for j in eachindex(ids)
+                for i in eachindex(ids)
+                    fill!(tmp, 0)
+                    b″ = bonds[ids[j]]
+                    b′ = bonds[ids[i]]
+                    coef = conj(coefficients[i]) * coefficients[j]
+                    measure_bond_correlation!(tmp, greens_estimator, b′, b″, coef)
+                    copyto_composite_correlation_container!(
+                        equaltime_composite_correlations,
+                        time_displaced_composite_correlations,
+                        measurement, tmp,
+                        unit_cell, lattice,
+                        b′.orbitals[1], b″.orbitals[1]
+                    )
+                end
+            end
+
+        elseif (correlation == "current_upup") || (correlation == "current_dndn")
+
+            (; bond_ids, bond_slices) = tight_binding_parameters
+            t = fermion_path_integral.t
+
+            for j in eachindex(ids)
+                for i in eachindex(ids)
+                    fill!(tmp, 0)
+                    # get hopping IDs
+                    hopping_id_j = ids[j]
+                    hopping_id_i = ids[i]
+                    # get bond IDs corresponding to hopping IDs
+                    bond_id_j = bond_ids[hopping_id_j]
+                    bond_id_i = bond_ids[hopping_id_i]
+                    # get corresponding bond definitions
+                    b″ = bonds[bond_id_j]
+                    b′ = bonds[bond_id_i]
+                    # get hopping amplitudes associated with hopping IDs
+                    tj = reshape(view(t, bond_slices[hopping_id_j], :), (L...,Lτ))
+                    ti = reshape(view(t, bond_slices[hopping_id_i], :), (L...,Lτ))
+                    # reshape array containing hopping amplitudes
+                    t″ = PermutedDimsArray(tj, (D+1, 1:D...))
+                    t′ = PermutedDimsArray(ti, (D+1, 1:D...))
+                    coef = conj(coefficients[i]) * coefficients[j]
+                    measure_current_correlation!(
+                        tmp, greens_estimator,
+                        b′, b″, t′, t″, +1, +1, coef
+                    )
+                    copyto_composite_correlation_container!(
+                        equaltime_composite_correlations,
+                        time_displaced_composite_correlations,
+                        measurement, tmp,
+                        unit_cell, lattice,
+                        b′.orbitals[1], b″.orbitals[1]
+                    )
+                end
+            end
+
+        elseif (correlation == "current_updn") || (correlation == "current_dnup")
+
+            (; bond_ids, bond_slices) = tight_binding_parameters
+            t = fermion_path_integral.t
+
+            for j in eachindex(ids)
+                for i in eachindex(ids)
+                    fill!(tmp, 0)
+                    # get hopping IDs
+                    hopping_id_j = ids[j]
+                    hopping_id_i = ids[i]
+                    # get bond IDs corresponding to hopping IDs
+                    bond_id_j = bond_ids[hopping_id_j]
+                    bond_id_i = bond_ids[hopping_id_i]
+                    # get corresponding bond definitions
+                    b″ = bonds[bond_id_j]
+                    b′ = bonds[bond_id_i]
+                    # get hopping amplitudes associated with hopping IDs
+                    tj = reshape(view(t, bond_slices[hopping_id_j], :), (L...,Lτ))
+                    ti = reshape(view(t, bond_slices[hopping_id_i], :), (L...,Lτ))
+                    # reshape array containing hopping amplitudes
+                    t″ = PermutedDimsArray(tj, (D+1, 1:D...))
+                    t′ = PermutedDimsArray(ti, (D+1, 1:D...))
+                    coef = conj(coefficients[i]) * coefficients[j]
+                    measure_current_correlation!(
+                        tmp, greens_estimator,
+                        b′, b″, t′, t″, +1, -1, coef
+                    )
+                    copyto_composite_correlation_container!(
+                        equaltime_composite_correlations,
+                        time_displaced_composite_correlations,
+                        measurement, tmp,
+                        unit_cell, lattice,
+                        b′.orbitals[1], b″.orbitals[1]
+                    )
+                end
+            end
+
+        elseif correlation == "current"
+
+            (; bond_ids, bond_slices) = tight_binding_parameters
+            t = fermion_path_integral.t
+
+            for j in eachindex(ids)
+                for i in eachindex(ids)
+                    fill!(tmp, 0)
+                    # get hopping IDs
+                    hopping_id_j = ids[j]
+                    hopping_id_i = ids[i]
+                    # get bond IDs corresponding to hopping IDs
+                    bond_id_j = bond_ids[hopping_id_j]
+                    bond_id_i = bond_ids[hopping_id_i]
+                    # get corresponding bond definitions
+                    b″ = bonds[bond_id_j]
+                    b′ = bonds[bond_id_i]
+                    # get hopping amplitudes associated with hopping IDs
+                    tj = reshape(view(t, bond_slices[hopping_id_j], :), (L...,Lτ))
+                    ti = reshape(view(t, bond_slices[hopping_id_i], :), (L...,Lτ))
+                    # reshape array containing hopping amplitudes
+                    t″ = PermutedDimsArray(tj, (D+1, 1:D...))
+                    t′ = PermutedDimsArray(ti, (D+1, 1:D...))
+                    coef = conj(coefficients[i]) * coefficients[j]
+                    measure_current_correlation!(
+                        tmp, greens_estimator,
+                        b′, b″, t′, t″, coef
+                    )
+                    copyto_composite_correlation_container!(
+                        equaltime_composite_correlations,
+                        time_displaced_composite_correlations,
+                        measurement, tmp,
+                        unit_cell, lattice,
+                        b′.orbitals[1], b″.orbitals[1]
+                    )
+                end
+            end
+        end
+    end
+
+    return nothing
+end
+
+
+# make phonon green's function related measurements
+function make_phonon_greens_measurements!(
+    measurement_container::NamedTuple,
+    model_geometry::ModelGeometry{D,E},
+    electron_phonon_parameters::ElectronPhononParameters{T,E},
+) where {T<:Number, E<:AbstractFloat, D}
+
+    # make phonon green's function measurement
+    (; equaltime_correlations, time_displaced_correlations,
+       equaltime_composite_correlations, time_displaced_composite_correlations,
+       a, a′, a″
+    ) = measurement_container
+
+    # measure equal-time phonon greens function
+    if haskey(equaltime_correlations, "phonon_greens")
+        # measure phonon green's function
+        SmoQyDQMC.measure_equaltime_phonon_greens!(
+            equaltime_correlations["phonon_greens"], electron_phonon_parameters, model_geometry, 1.0, a, a′, a″
+        )
+    end
+
+    # measure time-displaced phonon greens function
+    if haskey(time_displaced_correlations, "phonon_greens")
+        # measure phonon green's function
+        SmoQyDQMC.measure_time_displaced_phonon_greens!(
+            time_displaced_correlations["phonon_greens"], electron_phonon_parameters, model_geometry, 1.0, a, a′, a″
+        )
+    end
+
+    # iterate over composite equal-time correlations
+    for name in keys(equaltime_composite_correlations)
+        # check if composite phonon green's function measurement
+        if equaltime_composite_correlations[name].correlation == "phonon_greens"
+            # measure equal-time composite phonon green's function
+            SmoQyDQMC.measure_equaltime_composite_phonon_greens!(
+                equaltime_composite_correlations[name], electron_phonon_parameters, model_geometry, 1.0, a, a′, a″
+            )
+        end
+    end
+
+    # iterate over composite equal-time correlations
+    for name in keys(time_displaced_composite_correlations)
+        # check if composite phonon green's function measurement
+        if time_displaced_composite_correlations[name].correlation == "phonon_greens"
+            # measure equal-time composite phonon green's function
+            SmoQyDQMC.measure_time_displaced_composite_phonon_greens!(
+                time_displaced_composite_correlations[name], electron_phonon_parameters, model_geometry, 1.0, a, a′, a″
+            )
+        end
+    end
+
+    return nothing
+end
+
+
+# get the id pairs associated with correlation measurement
+function get_correlation_id_pairs(
     equaltime_correlations::Dict{String, CorrelationContainer{D,T}},
     time_displaced_correlations::Dict{String, CorrelationContainer{Dp1,T}},
     measurement::String
@@ -374,6 +781,57 @@ function get_id_pairs(
     end
 
     return id_pairs
+end
+
+
+# get id's associated with composite correlation measurement
+function get_composite_correlation_ids(
+    equaltime_composite_correlations::Dict{String, CompositeCorrelationContainer{D,T}},
+    time_displaced_composite_correlations::Dict{String, CompositeCorrelationContainer{Dp1,T}},
+    measurement::String
+) where {D, Dp1, T}
+
+    if measurement in keys(equaltime_composite_correlations)
+        ids = equaltime_composite_correlations[measurement].ids
+    elseif measurement in keys(time_displaced_composite_correlations)
+        ids = time_displaced_composite_correlations[measurement].ids
+    end
+
+    return ids
+end
+
+
+# get the type of correlation measurement that needs to made to perform a specified
+# composite correlation measurement
+function get_composite_correlation_type(
+    equaltime_composite_correlations::Dict{String, CompositeCorrelationContainer{D,T}},
+    time_displaced_composite_correlations::Dict{String, CompositeCorrelationContainer{Dp1,T}},
+    measurement::String
+) where {D, Dp1, T}
+
+    if measurement in keys(equaltime_composite_correlations)
+        correlation = equaltime_composite_correlations[measurement].correlation
+    elseif measurement in keys(time_displaced_composite_correlations)
+        correlation = time_displaced_composite_correlations[measurement].correlation
+    end
+
+    return correlation
+end
+
+# get composite correlation ratio coefficients
+function get_composite_correlation_coefficients(
+    equaltime_composite_correlations::Dict{String, CompositeCorrelationContainer{D,T}},
+    time_displaced_composite_correlations::Dict{String, CompositeCorrelationContainer{Dp1,T}},
+    measurement::String
+) where {D, Dp1, T}
+
+    if measurement in keys(equaltime_composite_correlations)
+        coefficients = equaltime_composite_correlations[measurement].coefficients
+    elseif measurement in keys(time_displaced_composite_correlations)
+        coefficients = time_displaced_composite_correlations[measurement].coefficients
+    end
+
+    return coefficients
 end
 
 
@@ -397,6 +855,50 @@ function copyto_correlation_container!(
     if measurement in keys(time_displaced_correlations)
         correlations = time_displaced_correlations[measurement].correlations[i]
         @. correlations += tmp
+    end
+
+    return nothing
+end
+
+# record the composite correlatin measurement stored in tmp to appropriate containers,
+# including calculating the fourier transform to get the correspond structure factor
+function copyto_composite_correlation_container!(
+    equaltime_composite_correlations::Dict{String, CompositeCorrelationContainer{D,T}},
+    time_displaced_composite_correlations::Dict{String, CompositeCorrelationContainer{Dp1,T}},
+    measurement::String,
+    tmp::AbstractArray{Complex{T}, Dp1},
+    unit_cell::UnitCell{D,T},
+    lattice::Lattice{D},
+    a::Int, b::Int # orbital species for performing fourier transform to momentum space
+) where {D, Dp1, T<:AbstractFloat}
+
+    # record equal-time correlation measurements
+    if measurement in keys(equaltime_composite_correlations)
+        correlations = equaltime_composite_correlations[measurement].correlations
+        eqltm_tmp = selectdim(tmp, Dp1, 1)
+        @. correlations += eqltm_tmp
+    end
+
+    # record time-displaced correlation measurements
+    if measurement in keys(time_displaced_composite_correlations)
+        correlations = time_displaced_composite_correlations[measurement].correlations
+        @. correlations += tmp
+    end
+
+    # fourier transform to momentum space
+    fourier_transform!(tmp, a, b, unit_cell, lattice)
+
+    # record equal-time structure factor measurements
+    if measurement in keys(equaltime_composite_correlations)
+        structure_factors = equaltime_composite_correlations[measurement].structure_factors
+        eqltm_tmp = selectdim(tmp, Dp1, 1)
+        @. structure_factors += eqltm_tmp
+    end
+
+    # record time-displaced correlation measurements
+    if measurement in keys(time_displaced_composite_correlations)
+        structure_factors = time_displaced_composite_correlations[measurement].structure_factors
+        @. structure_factors += tmp
     end
 
     return nothing

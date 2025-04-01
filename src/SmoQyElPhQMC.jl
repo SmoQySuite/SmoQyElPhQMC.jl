@@ -33,6 +33,9 @@ using Checkerboard
 # import for propagator types
 using JDQMCFramework
 
+# import for some measurement routines
+import JDQMCMeasurements: fourier_transform!
+
 # functions to overload
 import Base: size, eltype
 import LinearAlgebra: mul!, lmul!, ldiv!
