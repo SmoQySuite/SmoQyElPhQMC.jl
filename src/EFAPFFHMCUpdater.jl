@@ -160,7 +160,7 @@ function hmc_update!(
 
         # calculate derivative of fermionic action for spin-up electrons
         Sf, iters, ϵ = calculate_∂Sf∂x!(∂S∂x, Φ, Λ, fermion_det_matrix, electron_phonon_parameters, preconditioner, rng, u, u′, u″)
-        iters_avg += iters / Nt
+        iters_avg += iters / (Nt+1)
 
         # calculate the anharmonic phonon potential contribution to the action derivative
         SmoQyDQMC.eval_derivative_anharmonic_action!(∂S∂x, x, Δτ, phonon_parameters)
@@ -184,6 +184,7 @@ function hmc_update!(
 
     # calculate final spin-up fermionic action
     Sf′, iters, ϵ = calculate_Ψ!(u, Φ, Λ, fermion_det_matrix, preconditioner, rng, power = 2.0)
+    iters_avg += iters / (Nt+1)
 
     # calculate final bosonic action
     Sb′ = SmoQyDQMC.bosonic_action(electron_phonon_parameters, holstein_correction = false)

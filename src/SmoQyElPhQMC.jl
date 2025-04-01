@@ -68,6 +68,12 @@ import SmoQyDQMC: hmc_update!
 include("EFAPFFHMCUpdater.jl")
 export EFAPFFHMCUpdater
 
+import SmoQyDQMC: reflection_update!
+include("reflection_update.jl")
+
+import SmoQyDQMC: swap_update!
+include("swap_update.jl")
+
 include("Measurements/GreensEstimator.jl")
 export GreensEstimator
 
