@@ -107,6 +107,7 @@ include("Measurements/Correlations/bond.jl")
 include("Measurements/Correlations/current.jl")
 include("Measurements/make_measurements.jl")
 
+using MuTuner
 import SmoQyDQMC: update_chemical_potential!
 include("update_chemical_potential.jl")
 
