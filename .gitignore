@@ -1,6 +1,12 @@
 *.jl.*.cov
 *.jl.cov
 *.jl.mem
-/Manifest.toml
-/docs/Manifest.toml
-/docs/build/
+Manifest.toml
+docs/Manifest.toml
+test/Manifest.toml
+docs/build/
+literate_scripts/*/
+example_scripts/*/
+*.jld2
+*.DS_Store
+.DS_Store

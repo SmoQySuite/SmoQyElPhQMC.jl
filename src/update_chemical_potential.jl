@@ -47,7 +47,7 @@ function update_chemical_potential!(
     Nsqrd = measure_Nsqrd(greens_estimator)
 
     # update the chemical potential
-    μ = MuTuner.update!(μtuner=chemical_potential_tuner, n=n, N²=Nsqrd, s=sgn)
+    μ = MuTuner.update!(chemical_potential_tuner, n, Nsqrd, sgn)
 
     # update tight binding parameter chemical potential
     tight_binding_parameters.μ = μ

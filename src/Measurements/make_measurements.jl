@@ -9,7 +9,9 @@
         tight_binding_parameters::TightBindingParameters{T,E},
         electron_phonon_parameters::ElectronPhononParameters{T,E},
         preconditioner = I,
-        rng::AbstractRNG = Random.default_rng()
+        rng::AbstractRNG = Random.default_rng(),
+        tol::E = fermion_det_matrix.cg.tol,
+        maxiter::Int = fermion_det_matrix.cg.maxiter
     ) where {T<:Number, E<:AbstractFloat, D}
 
 Make all measurements.
@@ -24,15 +26,19 @@ function make_measurements!(
     tight_binding_parameters::TightBindingParameters{T,E},
     electron_phonon_parameters::ElectronPhononParameters{T,E},
     preconditioner = I,
-    rng::AbstractRNG = Random.default_rng()
+    rng::AbstractRNG = Random.default_rng(),
+    tol::E = fermion_det_matrix.cg.tol,
+    maxiter::Int = fermion_det_matrix.cg.maxiter
 ) where {T<:Number, E<:AbstractFloat, D}
 
     # initialize the Green's function estimator to reflect the current
     # fermion determinant matrix
-    update_greens_estimator!(
+    iters = update_greens_estimator!(
         greens_estimator, fermion_det_matrix,
         preconditioner = preconditioner,
-        rng = rng
+        rng = rng,
+        tol = tol,
+        maxiter = maxiter
     )
 
     # make global measurements
@@ -80,7 +86,7 @@ function make_measurements!(
         electron_phonon_parameters,
     )
 
-    return nothing
+    return iters
 end
 
 # make global measurements

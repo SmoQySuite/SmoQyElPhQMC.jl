@@ -25,43 +25,41 @@ end
 @doc raw"""
     GreensEstimator(
         # Arguments
-        fdm::FermionDetMatrix{T,E},
-        unitcell::UnitCell{D,E},
-        lattice::Lattice{D};
+        fermion_det_matrix::FermionDetMatrix{T,E},
+        model_geometry::ModelGeometry{D,E};
         # Keyword Arguments
         Nrv::Int = 10,
         preconditioner = I,
         rng::AbstractRNG = Random.default_rng(),
-        maxiter::Int = fdm.cgs.maxiter,
-        tol::E = fdm.cgs.tol
+        maxiter::Int = fermion_det_matrix.cgs.maxiter,
+        tol::E = fermion_det_matrix.cgs.tol
     ) where {D, T<:Number, E<:AbstractFloat}
 
 Initialize an instance of the type [`GreensEstimator`](@ref).
 
 # Arguments
 
-- `fdm::FermionDetMatrix{T,E}`: Fermion determinant matrix.
-- `unitcell::UnitCell{D,E}`: Defines unit cell of the lattice.
-- `lattice::Lattice{D}`: Defines the lattice.
+- `fermion_det_matrix::FermionDetMatrix{T,E}`: Fermion determinant matrix.
+- `model_geometry::ModelGeometry{D,E}`: Defines model geometry.
 
 # Keyword Arguments
 
 - `Nrv::Int = 10`: Number of random vectors used to approximate Green's function.
 - `preconditioner = I`: Preconditioner used to solve linear system.
 - `rng = Random.default_rng()`: Random number generator.
-- `maxiter::Int = fdm.cgs.maxiter`: Maximum number of iterations for linear solver.
-- `tol::E = fdm.cgs.tol`: Tolerance for linear solver.
+- `maxiter::Int = fermion_det_matrix.cgs.maxiter`: Maximum number of iterations for linear solver.
+- `tol::E = fermion_det_matrix.cgs.tol`: Tolerance for linear solver.
 """
 function GreensEstimator(
     # Arguments
-    fdm::FermionDetMatrix{T,E},
+    fermion_det_matrix::FermionDetMatrix{T,E},
     model_geometry::ModelGeometry{D,E};
     # Keyword Arguments
     Nrv::Int = 10,
     preconditioner = I,
     rng::AbstractRNG = Random.default_rng(),
-    maxiter::Int = fdm.cgs.maxiter,
-    tol::E = fdm.cgs.tol
+    maxiter::Int = fermion_det_matrix.cgs.maxiter,
+    tol::E = fermion_det_matrix.cgs.tol
 ) where {D, T<:Number, E<:AbstractFloat}
 
     (; unit_cell, lattice) = model_geometry
@@ -72,7 +70,7 @@ function GreensEstimator(
     # number of unit cells
     N = lattice.N
     # dimension of fermion determinant matrix
-    V = size(fdm, 1)
+    V = size(fermion_det_matrix, 1)
     # length of imaginary-time axis
     Lτ = V ÷ (n * N)
 
@@ -96,7 +94,7 @@ function GreensEstimator(
 
     # update green's function estimator to reflect current fermion determinant matrix
     update_greens_estimator!(
-        greens_estimator, fdm,
+        greens_estimator, fermion_det_matrix,
         preconditioner = preconditioner,
         rng = rng,
         maxiter = maxiter,
@@ -110,11 +108,11 @@ end
 # update the greens estimator to reflect the current fermion determinant matrix
 function update_greens_estimator!(
     greens_estimator::GreensEstimator{T},
-    fdm::FermionDetMatrix{T,E};
+    fermion_det_matrix::FermionDetMatrix{T,E};
     preconditioner = I,
     rng = Random.default_rng(),
-    maxiter::Int = fdm.cgs.maxiter,
-    tol::E = max(fdm.cgs.tol^2, 1e-10)
+    maxiter::Int,
+    tol::E
 ) where {T<:Number, E<:AbstractFloat}
 
     (; Nrv, V, MtR) = greens_estimator
@@ -133,28 +131,31 @@ function update_greens_estimator!(
     # end
 
     # udpate preconditioner
-    update_preconditioner!(preconditioner, fdm, rng)
+    update_preconditioner!(preconditioner, fermion_det_matrix, rng)
 
     # iterate over random vectors
+    avg_iters = 0.0
     for n in axes(R, 2)
         R′ = @view R[:, n]
         GR′ = @view GR[:, n]
         # Calculate Mᵀ⋅R
-        mul_Mt!(MtR, fdm, R′)
+        mul_Mt!(MtR, fermion_det_matrix, R′)
         # solve [Mᵀ⋅M]⁻¹⋅x = Mᵀ⋅R ==> x = M⁻¹⋅R = G⋅R
         iters, ϵ = ldiv!(
-            GR′, fdm, MtR,
+            GR′, fermion_det_matrix, MtR,
             preconditioner = preconditioner,
             rng = rng,
             maxiter = maxiter,
             tol = tol
         )
+        avg_iters += iters
     end
+    avg_iters /= Nrv
 
     # calculate conjugated random variables, Rt = conj(R)
     @. greens_estimator.Rt = conj(greens_estimator.Rt)
 
-    return nothing
+    return avg_iters
 end
 
 

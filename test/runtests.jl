@@ -1,6 +1,8 @@
 using SmoQyElPhQMC
 using Test
+using TestItemRunner
 
 @testset "SmoQyElPhQMC.jl" begin
-    # Write your tests here.
+    
+    @run_package_tests
 end

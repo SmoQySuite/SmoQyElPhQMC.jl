@@ -2,12 +2,14 @@
     reflection_update!(
         # ARGUMENTS
         electron_phonon_parameters::ElectronPhononParameters{T,E},
-        hmc_updater::EFAPFFHMCUpdater{E};
+        pff_calculator::PFFCalculator{E};
         # KEYWORD ARGUMENTS
         fermion_path_integral::FermionPathIntegral{T,E},
         fermion_det_matrix::FermionDetMatrix{T,E},
         rng::AbstractRNG,
         preconditioner = I,
+        tol::E = fermion_det_matrix.cg.tol,
+        maxiter::Int = fermion_det_matrix.cg.maxiter,
         phonon_types = nothing
     ) where {T<:Number, E<:AbstractFloat}
 
@@ -21,16 +23,17 @@ that are included for randomly sampling a phonon mode in the lattice to perform 
 function reflection_update!(
     # ARGUMENTS
     electron_phonon_parameters::ElectronPhononParameters{T,E},
-    hmc_updater::EFAPFFHMCUpdater{E};
+    pff_calculator::PFFCalculator{E};
     # KEYWORD ARGUMENTS
     fermion_path_integral::FermionPathIntegral{T,E},
     fermion_det_matrix::FermionDetMatrix{T,E},
     rng::AbstractRNG,
     preconditioner = I,
+    tol::E = fermion_det_matrix.cg.tol,
+    maxiter::Int = fermion_det_matrix.cg.maxiter,
     phonon_types = nothing
 ) where {T<:Number, E<:AbstractFloat}
 
-    (; u, Φ, Λ) = hmc_updater
     phonon_parameters = electron_phonon_parameters.phonon_parameters
     holstein_parameters = electron_phonon_parameters.holstein_parameters_up
     ssh_parameters = electron_phonon_parameters.ssh_parameters_up
@@ -62,11 +65,10 @@ function reflection_update!(
     # get the corresponding phonon fields
     x_i = @view x[phonon_mode, :]
 
-    # initialize Λ matrix to make sure it is up to date.
-    update_Λ!(Λ, electron_phonon_parameters)
-
-    # sample Φ fields
-    Sf = sample_Φ!(Φ, fermion_det_matrix, Λ, rng)
+    # sample pseudofermion fields and calculate initial fermionic action
+    Sf = sample_pseudofermion_fields!(
+        pff_calculator, electron_phonon_parameters, fermion_det_matrix, rng
+    )
 
     # calculate the initial bosonic action
     Sb = SmoQyDQMC.bosonic_action(electron_phonon_parameters, holstein_correction = false)
@@ -96,11 +98,11 @@ function reflection_update!(
     # update the fermion determinant matrix
     update!(fermion_det_matrix, fermion_path_integral)
 
-    # initialize Λ matrix to make sure it is up to date.
-    update_Λ!(Λ, electron_phonon_parameters)
-
-    # calculate final spin-up fermionic action
-    Sf′, iters, ϵ = calculate_Ψ!(u, Φ, Λ, fermion_det_matrix, preconditioner, rng, power = 2.0)
+    # calculate final fermionic action
+    Sf′, iters, ϵ = calculate_fermionic_action!(
+        pff_calculator, electron_phonon_parameters, fermion_det_matrix,
+        preconditioner, rng, tol, maxiter
+    )
 
     # calculate the initial bosonic action
     Sb′ = SmoQyDQMC.bosonic_action(electron_phonon_parameters, holstein_correction = false)

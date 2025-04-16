@@ -2,20 +2,20 @@
     abstract type KPMPreconditioner{T<:Number, E<:AbstractFloat} end
 
 Abstract type representing the KPM preconditioner appearing in the left-preconditioned linear system
-```
+```math
 P^{-1} \cdot \left[ M^{\dagger} M^{\phantom\dagger} \right] \cdot x = P^{-1} \cdot b
 ```
 that is solved for using the Conjugate Gradient method, where ``M`` is the fermion determinant matrix.
 Here, a KPM preconditioner represents
-```
+```math
 P^{-1} = \left[ \bar{M}^{\dagger} \bar{M}^{\phantom\dagger} \right]^{-1}
 ```
 with a Chebyshev expansion in powers of
-```
+```math
 \bar{B} = \frac{1}{L_\tau} \sum_{l=0}^{L_\tau-1} B_l,
 ```
 where
-```
+```math
 \bar{M} = \left(\begin{array}{ccccc}
     I &  &  &  & \bar{B}\\
     -\bar{B} & I\\
@@ -31,24 +31,24 @@ abstract type KPMPreconditioner{T<:Number, E<:AbstractFloat} end
     mutable struct SymKPMPreconditioner{T, E, Tfft, Tifft} <: KPMPreconditioner{T, E}
 
 Type representing the KPM preconditioner appearing in the left-preconditioned linear system
-```
+```math
 P^{-1} \cdot \left[ M^{\dagger} M^{\phantom\dagger} \right] \cdot x = P^{-1} \cdot b
 ```
 that is solved for using the Conjugate Gradient method, where ``M`` is the fermion determinant matrix
 defined using the symmetric propagator definition
-```
+```math
 B_l = e^{-\Delta\tau K_l/2} e^{-\Delta\tau V_l} e^{-\Delta\tau K_l/2}.
 ```
 Here, a KPM preconditioner represents
-```
+```math
 P^{-1} = \left[ \bar{M}^{\dagger} \bar{M}^{\phantom\dagger} \right]^{-1}
 ```
 with a Chebyshev expansion in powers of
-```
+```math
 \bar{B} = \frac{1}{L_\tau} \sum_{l=0}^{L_\tau-1} B_l,
 ```
 where
-```
+```math
 \bar{M} = \left(\begin{array}{ccccc}
     I &  &  &  & \bar{B}\\
     -\bar{B} & I\\
@@ -102,24 +102,24 @@ end
     mutable struct AsymKPMPreconditioner{T, E, Tfft, Tifft} <: KPMPreconditioner{T, E}
 
 Type representing the KPM preconditioner appearing in the left-preconditioned linear system
-```
+```math
 P^{-1} \cdot \left[ M^{\dagger} M^{\phantom\dagger} \right] \cdot x = P^{-1} \cdot b
 ```
 that is solved for using the Conjugate Gradient method, where ``M`` is the fermion determinant matrix
 defined using the asymmetric propagator definition
-```
+```math
 B_l = e^{-\Delta\tau V_l} e^{-\Delta\tau K_l}.
 ```
 Here, a KPM preconditioner represents
-```
+```math
 P^{-1} = \left[ \bar{M}^{\dagger} \bar{M}^{\phantom\dagger} \right]^{-1}
 ```
 with a Chebyshev expansion in powers of
-```
+```math
 \bar{B} = \frac{1}{L_\tau} \sum_{l=0}^{L_\tau-1} B_l,
 ```
 where
-```
+```math
 \bar{M} = \left(\begin{array}{ccccc}
     I &  &  &  & \bar{B}\\
     -\bar{B} & I\\
@@ -172,7 +172,7 @@ end
 
 @doc raw"""
     KPMPreconditioner(
-        fdm::FermionDetMatrix{T};
+        fermion_det_matrix::FermionDetMatrix{T};
         # Keyword Arguments
         rng::AbstractRNG = Random.default_rng(),
         rbuf::E = 0.10,
@@ -185,7 +185,7 @@ Initialize and return an instance of either the [`SymKPMPreconditioner`](@ref) o
 
 # Arguments
 
-- `fdm::FermionDetMatrix{T}`: Fermion determinant matrix.
+- `fermion_det_matrix::FermionDetMatrix{T}`: Fermion determinant matrix.
 
 # Keyword Arguments
 
@@ -196,7 +196,7 @@ Initialize and return an instance of either the [`SymKPMPreconditioner`](@ref) o
 - `a2::E = 1.0`: Controls minimum order of kpm expansion.
 """
 function KPMPreconditioner(
-    fdm::FermionDetMatrix{T};
+    fermion_det_matrix::FermionDetMatrix{T};
     # Keyword Arguments
     rng::AbstractRNG = Random.default_rng(),
     rbuf::E = 0.10,
@@ -205,8 +205,8 @@ function KPMPreconditioner(
     a2::E = 1.0
 ) where {T<:Number, E<:AbstractFloat}
 
-    (; expnΔτV, coshΔτt, sinhΔτt) = fdm
-    (; checkerboard_neighbor_table, checkerboard_perm, checkerboard_colors) = fdm
+    (; expnΔτV, coshΔτt, sinhΔτt) = fermion_det_matrix
+    (; checkerboard_neighbor_table, checkerboard_perm, checkerboard_colors) = fermion_det_matrix
     (Lτ, N) = size(expnΔτV)
 
     # initialize temporaray storage vectors
@@ -243,7 +243,7 @@ function KPMPreconditioner(
         checkerboard_perm, invperm(checkerboard_perm), hcat([[first(r),last(r)] for r in checkerboard_colors]...)
     )
 
-    if isa(fdm, SymFermionDetMatrix)
+    if isa(fermion_det_matrix, SymFermionDetMatrix)
 
         # get half the frequencies
         Lτo2 = cld(Lτ, 2)
@@ -276,7 +276,7 @@ function KPMPreconditioner(
     end
 
     # update KPM preconditioner
-    update_preconditioner!(Pkpm, fdm, rng)
+    update_preconditioner!(Pkpm, fermion_det_matrix, rng)
 
     return Pkpm
 end
@@ -551,14 +551,14 @@ end
 # update KPM preconditioner to reflect fermion determinant matrix
 function update_preconditioner!(
     Pkpm::KPMPreconditioner,
-    fdm::FermionDetMatrix,
+    fermion_det_matrix::FermionDetMatrix,
     rng::AbstractRNG
 )
 
     (; B̄, rbuf) = Pkpm
 
     # update B̄ propagator matrix
-    update_B̄!(B̄, fdm)
+    update_B̄!(B̄, fermion_det_matrix)
 
     # calculate eigenbounds
     ϵ_min_new, ϵ_max_new = calculate_bounds!(Pkpm, rng)
@@ -599,21 +599,21 @@ update_preconditioner!(P, ignore...) = nothing
 
 
 # update B̄ propagator matrix
-function update_B̄!(B̄::SymChkbrdPropagator, fdm::SymFermionDetMatrix)
+function update_B̄!(B̄::SymChkbrdPropagator, fermion_det_matrix::SymFermionDetMatrix)
 
-    mean!(B̄.expmΔτV, fdm.expnΔτV')
-    mean!(B̄.expmΔτKo2.coshΔτt, fdm.coshΔτt')
-    mean!(B̄.expmΔτKo2.sinhΔτt, fdm.sinhΔτt')
+    mean!(B̄.expmΔτV, fermion_det_matrix.expnΔτV')
+    mean!(B̄.expmΔτKo2.coshΔτt, fermion_det_matrix.coshΔτt')
+    mean!(B̄.expmΔτKo2.sinhΔτt, fermion_det_matrix.sinhΔτt')
 
     return nothing
 end
 
 # update B̄ propagator matrix
-function update_B̄!(B̄::AsymChkbrdPropagator, fdm::AsymFermionDetMatrix)
+function update_B̄!(B̄::AsymChkbrdPropagator, fermion_det_matrix::AsymFermionDetMatrix)
 
-    mean!(B̄.expmΔτV, fdm.expnΔτV')
-    mean!(B̄.expmΔτK.coshΔτt, fdm.coshΔτt')
-    mean!(B̄.expmΔτK.sinhΔτt, fdm.sinhΔτt')
+    mean!(B̄.expmΔτV, fermion_det_matrix.expnΔτV')
+    mean!(B̄.expmΔτK.coshΔτt, fermion_det_matrix.coshΔτt')
+    mean!(B̄.expmΔτK.sinhΔτt, fermion_det_matrix.sinhΔτt')
 
     return nothing
 end

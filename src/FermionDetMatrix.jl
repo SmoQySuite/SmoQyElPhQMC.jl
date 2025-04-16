@@ -2,7 +2,7 @@
     FermionDetMatrix{T<:Number, E<:AbstractFloat}
 
 A abstract type to represent fermion determinant matrix
-```
+```math
 M = \left(\begin{array}{ccccc}
     I &  &  &  & B_{0}\\
     -B_{1} & I\\
@@ -22,7 +22,7 @@ abstract type FermionDetMatrix{T<:Number, E<:AbstractFloat} end
     SymFermionDetMatrix{T<:Number, E<:AbstractFloat} <: FermionDetMatrix{T,E}
 
 A type to represent fermion determinant matrix
-```
+```math
 M = \left(\begin{array}{ccccc}
     I &  &  &  & B_{0}\\
     -B_{1} & I\\
@@ -32,14 +32,14 @@ M = \left(\begin{array}{ccccc}
 \end{array}\right),
 ```
 where
-```
+```math
 B_l = \left[ e^{-\Delta\tau K_l/2} \right]^\dagger e^{-\Delta\tau V_l} e^{-\Delta\tau K_l/2}
 ```
 are Hermitian (symmetric if real) propagator matrices for imaginary-time slice ``\tau = \Delta\tau \cdot l`` given
 an inverse temperature ``\beta = \Delta\tau \cdot L_\tau``. A Fermion determinant matrix ``M``
 will be ``N L_\tau \times N L_\tau``, where each propagator matrix ``B_l`` is ``N \times N``,
-where ``N`` is the number of orbitals in the lattice. Here the matrix ``e^{-\Delta\tau K_l/2}`` is not Hermitian
-as it is approximated using the checkerboard approximation.
+where ``N`` is the number of orbitals in the lattice. Here the matrix ``e^{-\Delta\tau K_l/2}`` is 
+approximated using the non-hermitian checkerboard approximation.
 """
 struct SymFermionDetMatrix{T<:Number, E<:AbstractFloat} <: FermionDetMatrix{T,E}
 
@@ -54,13 +54,22 @@ struct SymFermionDetMatrix{T<:Number, E<:AbstractFloat} <: FermionDetMatrix{T,E}
     tmp2::Matrix{Complex{E}}
 end
 
+@doc raw"""
+    SymFermionDetMatrix(
+        fermion_path_integral::FermionPathIntegral{T, E};
+        maxiter::Int = (fermion_path_integral.N * fermion_path_integral.Lτ),
+        tol::E = 1e-6
+    ) where {T<:Number, E<:AbstractFloat}
+
+Initialize an instance of the [`SymFermionDetMatrix`](@ref) type.
+"""
 function SymFermionDetMatrix(
-    fpi::FermionPathIntegral{T, E};
-    maxiter::Int = (fpi.N * fpi.Lτ),
-    tol::E = 1e-5
+    fermion_path_integral::FermionPathIntegral{T, E};
+    maxiter::Int = (fermion_path_integral.N * fermion_path_integral.Lτ),
+    tol::E = 1e-6
 ) where {T<:Number, E<:AbstractFloat}
 
-    (; neighbor_table, t, V, N, β, Δτ, Lτ) = fpi
+    (; neighbor_table, t, V, N, β, Δτ, Lτ) = fermion_path_integral
 
     # get number of hoppings
     Nh = size(t, 1)
@@ -96,7 +105,7 @@ function SymFermionDetMatrix(
     )
 
     # upate FermionDetMatrixMultiplier
-    update!(sym_fdm, fpi)
+    update!(sym_fdm, fermion_path_integral)
 
     return sym_fdm
 end
@@ -106,7 +115,7 @@ end
     AsymFermionDetMatrix{T<:Number, E<:AbstractFloat} <: FermionDetMatrix{T, E}
 
 A type to represent fermion determinant matrix
-```
+```math
 M = \left(\begin{array}{ccccc}
     I &  &  &  & B_{0}\\
     -B_{1} & I\\
@@ -116,14 +125,14 @@ M = \left(\begin{array}{ccccc}
 \end{array}\right),
 ```
 where
-```
+```math
 B_l = e^{-\Delta\tau V_l} e^{-\Delta\tau K_l}
 ```
 are Hermitian (symmetric if real) propagator matrices for imaginary-time slice ``\tau = \Delta\tau \cdot l`` given
 an inverse temperature ``\beta = \Delta\tau \cdot L_\tau``. A Fermion determinant matrix ``M``
 will be ``N L_\tau \times N L_\tau``, where each propagator matrix ``B_l`` is ``N \times N``,
-where ``N`` is the number of orbitals in the lattice. Note that``e^{-\Delta\tau K_l}`` is
-represented using the checkerboard approximation.
+where ``N`` is the number of orbitals in the lattice. Note that ``e^{-\Delta\tau K_l}`` is
+represented using the non-hermitian checkerboard approximation.
 """
 struct AsymFermionDetMatrix{T<:Number, E<:AbstractFloat} <: FermionDetMatrix{T,E}
 
@@ -138,13 +147,22 @@ struct AsymFermionDetMatrix{T<:Number, E<:AbstractFloat} <: FermionDetMatrix{T,E
     tmp2::Matrix{Complex{E}}
 end
 
+@doc raw"""
+    AsymFermionDetMatrix(
+        fermion_path_integral::FermionPathIntegral{T, E};
+        maxiter::Int = (fermion_path_integral.N * fermion_path_integral.Lτ),
+        tol::E = 1e-6
+    ) where {T<:Number, E<:AbstractFloat}
+
+Initialize an instance of the [`AsymFermionDetMatrix`](@ref) type.
+"""
 function AsymFermionDetMatrix(
-    fpi::FermionPathIntegral{T, E};
-    maxiter::Int = (fpi.N * fpi.Lτ),
-    tol::E = 1e-5
+    fermion_path_integral::FermionPathIntegral{T, E};
+    maxiter::Int = (fermion_path_integral.N * fermion_path_integral.Lτ),
+    tol::E = 1e-6
 ) where {T<:Number, E<:AbstractFloat}
 
-    (; neighbor_table, t, N, Lτ) = fpi
+    (; neighbor_table, t, N, Lτ) = fermion_path_integral
 
     # get number of hoppings
     Nh = size(t, 1)
@@ -180,7 +198,7 @@ function AsymFermionDetMatrix(
     )
 
     # upate FermionDetMatrixMultiplier
-    update!(asym_fdm, fpi)
+    update!(asym_fdm, fermion_path_integral)
 
     return asym_fdm
 end
@@ -188,18 +206,18 @@ end
 
 # udpate fermion determinant matrix to reflect fermion path integral
 function update!(
-    fdm::FermionDetMatrix{T, E},
-    fpi::FermionPathIntegral{T, E}
+    fermion_det_matrix::FermionDetMatrix{T, E},
+    fermion_path_integral::FermionPathIntegral{T, E}
 ) where {T<:Number, E<:AbstractFloat}
 
-    (; expnΔτV, coshΔτt, sinhΔτt, checkerboard_perm) = fdm
-    (; t, V, Δτ) = fpi
+    (; expnΔτV, coshΔτt, sinhΔτt, checkerboard_perm) = fermion_det_matrix
+    (; t, V, Δτ) = fermion_path_integral
 
     # iterate over orbitals
     @views @. expnΔτV = exp(-Δτ * V')
 
     # imaginary-time discretization used in checkerboard approximation
-    Δτ′ = isa(fdm, AsymFermionDetMatrix) ? Δτ : Δτ/2
+    Δτ′ = isa(fermion_det_matrix, AsymFermionDetMatrix) ? Δτ : Δτ/2
 
     # iterate over hopping
     @simd for h in axes(t, 1)
@@ -217,28 +235,28 @@ end
 
 
 # return matrix element type of fermion determinant matrix
-eltype(fdm::FermionDetMatrix{T}) where {T} = T
+eltype(fermion_det_matrix::FermionDetMatrix{T}) where {T} = T
 
 # return size of fermion determinant matrix
-size(fdm::FermionDetMatrix) = (length(fdm.expnΔτV), length(fdm.expnΔτV))
-size(fdm::FermionDetMatrix, dim::Int) = length(fdm.expnΔτV)
+size(fermion_det_matrix::FermionDetMatrix) = (length(fermion_det_matrix.expnΔτV), length(fermion_det_matrix.expnΔτV))
+size(fermion_det_matrix::FermionDetMatrix, dim::Int) = length(fermion_det_matrix.expnΔτV)
 
 
 # evaluate v′ = [Mᵀ⋅M]⁻¹⋅v
 function ldiv!(
     v′::AbstractVecOrMat{Complex{E}},
-    fdm::FermionDetMatrix{T, E},
+    fermion_det_matrix::FermionDetMatrix{T, E},
     v::AbstractVecOrMat{Complex{E}};
     preconditioner = I,
     rng::AbstractRNG = Random.default_rng(),
-    maxiter::Int = fdm.cgs.maxiter,
-    tol::E = fdm.cgs.tol
+    maxiter::Int = fermion_det_matrix.cgs.maxiter,
+    tol::E = fermion_det_matrix.cgs.tol
 ) where {T<:Number, E<:AbstractFloat}
 
-    (; cgs) = fdm
-    update_preconditioner!(preconditioner, fdm, rng)
+    (; cgs) = fermion_det_matrix
+    update_preconditioner!(preconditioner, fermion_det_matrix, rng)
     iters, ϵ = cg_solve!(
-        v′, fdm, v, cgs, preconditioner,
+        v′, fermion_det_matrix, v, cgs, preconditioner,
         maxiter = maxiter,
         tol = tol
     )
@@ -248,16 +266,16 @@ end
 
 # evaluate v = [Mᵀ⋅M]⁻¹⋅v
 function ldiv!(
-    fdm::FermionDetMatrix{T, E},
+    fermion_det_matrix::FermionDetMatrix{T, E},
     v::AbstractVecOrMat{Complex{E}};
     preconditioner = I,
-    maxiter::Int = fdm.cgs.maxiter,
-    tol::E = fdm.cgs.tol,
+    maxiter::Int = fermion_det_matrix.cgs.maxiter,
+    tol::E = fermion_det_matrix.cgs.tol,
     rng::AbstractRNG = Random.default_rng()
 ) where {T<:Number, E<:AbstractFloat}
 
     iters, ϵ = ldiv!(
-        v, fdm, v,
+        v, fermion_det_matrix, v,
         preconditioner = preconditioner,
         rng = rng,
         maxiter = maxiter,
@@ -270,11 +288,11 @@ end
 
 # evaluate v = Mᵀ⋅M⋅v
 function lmul!(
-    fdm::FermionDetMatrix,
+    fermion_det_matrix::FermionDetMatrix,
     v::AbstractVecOrMat
 )
 
-    mul!(v, fdm, v)
+    mul!(v, fermion_det_matrix, v)
 
     return nothing
 end
@@ -283,11 +301,11 @@ end
 # evaluate v′ = Mᵀ⋅M⋅v
 function mul!(
     v′::AbstractVecOrMat,
-    fdm::FermionDetMatrix,
+    fermion_det_matrix::FermionDetMatrix,
     v::AbstractVecOrMat
 )
 
-    mul_MtM!(v′, fdm, v)
+    mul_MtM!(v′, fermion_det_matrix, v)
 
     return nothing
 end
@@ -295,11 +313,11 @@ end
 
 # evaluate v = Mᵀ⋅M⋅v
 function lmul_MtM!(
-    fdm::FermionDetMatrix,
+    fermion_det_matrix::FermionDetMatrix,
     v::AbstractVecOrMat
 )
 
-    mul_MtM!(v, fdm, v)
+    mul_MtM!(v, fermion_det_matrix, v)
 
     return nothing
 end
@@ -308,13 +326,13 @@ end
 # evaluate v′ = Mᵀ⋅M⋅v
 function mul_MtM!(
     v′::AbstractVecOrMat,
-    fdm::FermionDetMatrix,
+    fermion_det_matrix::FermionDetMatrix,
     v::AbstractVecOrMat
 )
 
-    (; tmp1) = fdm
-    mul_M!(tmp1, fdm, v)
-    mul_Mt!(v′, fdm, tmp1)
+    (; tmp1) = fermion_det_matrix
+    mul_M!(tmp1, fermion_det_matrix, v)
+    mul_Mt!(v′, fermion_det_matrix, tmp1)
 
     return nothing
 end
@@ -322,12 +340,12 @@ end
 
 # evaluate v = M⋅Mᵀ⋅v
 function lmul_MMt!(
-    fdm::FermionDetMatrix,
+    fermion_det_matrix::FermionDetMatrix,
     v::AbstractVecOrMat
 )
 
     
-    mul_MMt!(v, fdm, v)
+    mul_MMt!(v, fermion_det_matrix, v)
 
     return nothing
 end
@@ -336,13 +354,13 @@ end
 # evaluate v′ = M⋅Mᵀ⋅v
 function mul_MMt!(
     v′::AbstractVecOrMat,
-    fdm::FermionDetMatrix,
+    fermion_det_matrix::FermionDetMatrix,
     v::AbstractVecOrMat
 )
 
-    (; tmp1) = fdm
-    mul_Mt!(tmp1, fdm, v)
-    mul_M!(v′, fdm, tmp1)
+    (; tmp1) = fermion_det_matrix
+    mul_Mt!(tmp1, fermion_det_matrix, v)
+    mul_M!(v′, fermion_det_matrix, tmp1)
 
     return nothing
 end
@@ -350,13 +368,13 @@ end
 
 # evaluate v = M⋅v
 function lmul_M!(
-    fdm::FermionDetMatrix,
+    fermion_det_matrix::FermionDetMatrix,
     v::AbstractVecOrMat
 )
 
-    (; tmp2) = fdm
+    (; tmp2) = fermion_det_matrix
     copyto!(tmp2, v)
-    mul_M!(v, fdm, tmp2)
+    mul_M!(v, fermion_det_matrix, tmp2)
 
     return nothing
 end
@@ -364,11 +382,11 @@ end
 # evaluate v′ = M⋅v
 function mul_M!(
     v′::AbstractVecOrMat,
-    fdm::SymFermionDetMatrix,
+    fermion_det_matrix::SymFermionDetMatrix,
     v::AbstractVecOrMat
 )
 
-    (; expnΔτV, coshΔτt, sinhΔτt, checkerboard_neighbor_table) = fdm
+    (; expnΔτV, coshΔτt, sinhΔτt, checkerboard_neighbor_table) = fermion_det_matrix
     Lτ = size(expnΔτV, 1)
     N = size(expnΔτV, 2)
     u = reshaped(v, Lτ, N)
@@ -409,11 +427,11 @@ end
 # evaluate v′ = M⋅v
 function mul_M!(
     v′::AbstractVecOrMat,
-    fdm::AsymFermionDetMatrix,
+    fermion_det_matrix::AsymFermionDetMatrix,
     v::AbstractVecOrMat
 )
 
-    (; expnΔτV, coshΔτt, sinhΔτt, checkerboard_neighbor_table) = fdm
+    (; expnΔτV, coshΔτt, sinhΔτt, checkerboard_neighbor_table) = fermion_det_matrix
     Lτ = size(expnΔτV, 1)
     N = size(expnΔτV, 2)
     u = reshaped(v, Lτ, N)
@@ -448,13 +466,13 @@ end
 
 # evaluate v = M⋅v
 function lmul_Mt!(
-    fdm::FermionDetMatrix,
+    fermion_det_matrix::FermionDetMatrix,
     v::AbstractVecOrMat
 )
 
-    (; tmp2) = fdm
+    (; tmp2) = fermion_det_matrix
     copyto!(tmp2, v)
-    mul_Mt!(v, fdm, tmp2)
+    mul_Mt!(v, fermion_det_matrix, tmp2)
 
     return nothing
 end
@@ -463,11 +481,11 @@ end
 # evaluate v′ = Mᵀ⋅v
 function mul_Mt!(
     v′::AbstractVecOrMat,
-    fdm::SymFermionDetMatrix,
+    fermion_det_matrix::SymFermionDetMatrix,
     v::AbstractVecOrMat
 )
 
-    (; expnΔτV, coshΔτt, sinhΔτt, checkerboard_neighbor_table) = fdm
+    (; expnΔτV, coshΔτt, sinhΔτt, checkerboard_neighbor_table) = fermion_det_matrix
     Lτ = size(expnΔτV, 1)
     N = size(expnΔτV, 2)
     u = reshaped(v, Lτ, N)
@@ -511,11 +529,11 @@ end
 # evaluate v′ = Mᵀ⋅v
 function mul_Mt!(
     v′::AbstractVecOrMat,
-    fdm::AsymFermionDetMatrix,
+    fermion_det_matrix::AsymFermionDetMatrix,
     v::AbstractVecOrMat
 )
 
-    (; expnΔτV, coshΔτt, sinhΔτt, checkerboard_neighbor_table) = fdm
+    (; expnΔτV, coshΔτt, sinhΔτt, checkerboard_neighbor_table) = fermion_det_matrix
     Lτ = size(expnΔτV, 1)
     N = size(expnΔτV, 2)
     u = reshaped(v, Lτ, N)

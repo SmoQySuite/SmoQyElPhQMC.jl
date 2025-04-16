@@ -73,6 +73,11 @@ include("FourierTransformer.jl")
 include("KPMPreconditioner.jl")
 export KPMPreconditioner, SymKPMPreconditioner, AsymKPMPreconditioner
 
+# type to manage sampling and storing the pseudo-fermion field Φ
+# as well as calculating the fermionic action
+include("PFFCalculator.jl")
+export PFFCalculator
+
 # For performing HMC udpates to phonon fields that use exact fourier acceleration (EFA)
 # to improve sampling
 import SmoQyDQMC: hmc_update!
@@ -86,6 +91,10 @@ include("reflection_update.jl")
 # perform linear scaling swap update to phonon fields
 import SmoQyDQMC: swap_update!
 include("swap_update.jl")
+
+# perform radial update to phonon fields
+import SmoQyDQMC: radial_update!
+include("radial_update.jl")
 
 # type of estimate Green's function and Green's function Wick's contractions
 include("Measurements/GreensEstimator.jl")
@@ -107,8 +116,9 @@ include("Measurements/Correlations/bond.jl")
 include("Measurements/Correlations/current.jl")
 include("Measurements/make_measurements.jl")
 
-using MuTuner
-import SmoQyDQMC: update_chemical_potential!
+import MuTuner
+import MuTuner: MuTunerLogger
+import SmoQyDQMC: update_chemical_potential! 
 include("update_chemical_potential.jl")
 
 end

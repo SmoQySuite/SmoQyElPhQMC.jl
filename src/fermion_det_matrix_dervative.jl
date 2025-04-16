@@ -4,12 +4,13 @@ function mul_νRe∂M∂x!(
     ν::E,
     u::AbstractVecOrMat,
     v::AbstractVecOrMat,
-    fdm::SymFermionDetMatrix{T,E},
+    fermion_det_matrix::SymFermionDetMatrix{T,E},
     elph::ElectronPhononParameters{T,E},
 ) where {T<:Number, E<:AbstractFloat}
 
-    (; expnΔτV, coshΔτt, sinhΔτt, checkerboard_neighbor_table, checkerboard_colors, checkerboard_perm) = fdm
-    v′, u′ = fdm.tmp1, fdm.tmp2
+    (; expnΔτV, coshΔτt, sinhΔτt, checkerboard_neighbor_table,
+       checkerboard_colors, checkerboard_perm) = fermion_det_matrix
+    v′, u′ = fermion_det_matrix.tmp1, fermion_det_matrix.tmp2
     Δτ = elph.Δτ
     ssh_parameters = elph.ssh_parameters_up
     holstein_parameters = elph.holstein_parameters_up
@@ -48,7 +49,7 @@ function mul_νRe∂M∂x!(
         # iterate over checkerboard colors in reverse order
         for color in Ncolors:-1:1
             # calculate -ν⋅Re[⟨u′|Δτ⋅∂Kc/∂x|v′⟩]
-            _mul_νReΔτ∂Kc∂x!(νRe∂M∂x, -ν, u′, v′, fdm, elph, Δτ/2, color)
+            _mul_νReΔτ∂Kc∂x!(νRe∂M∂x, -ν, u′, v′, fermion_det_matrix, elph, Δτ/2, color)
             # |u′⟩ := exp(-Δτ⋅Kc)|u′⟩
             checkerboard_lmul!(
                 u′, checkerboard_neighbor_table, coshΔτt, sinhΔτt,
@@ -95,7 +96,7 @@ function mul_νRe∂M∂x!(
         # iterate over checkerboard colors in reverse order
         for color in 1:Ncolors
             # calculate -ν⋅Re[⟨u′|Δτ⋅∂Kc/∂x|v′⟩]
-            _mul_νReΔτ∂Kc∂x!(νRe∂M∂x, -ν, u′, v′, fdm, elph, Δτ/2, color)
+            _mul_νReΔτ∂Kc∂x!(νRe∂M∂x, -ν, u′, v′, fermion_det_matrix, elph, Δτ/2, color)
             # |u′⟩ := exp(-Δτ⋅Kc)|u′⟩
             checkerboard_lmul!(
                 u′, checkerboard_neighbor_table, coshΔτt, sinhΔτt,
@@ -118,12 +119,13 @@ function mul_νRe∂M∂x!(
     ν::E,
     u::AbstractVecOrMat,
     v::AbstractVecOrMat,
-    fdm::AsymFermionDetMatrix{T,E},
+    fermion_det_matrix::AsymFermionDetMatrix{T,E},
     elph::ElectronPhononParameters{T,E}
 ) where {T<:Number, E<:AbstractFloat}
 
-    (; expnΔτV, coshΔτt, sinhΔτt, checkerboard_neighbor_table, checkerboard_colors, checkerboard_perm) = fdm
-    v′, u′ = fdm.tmp1, fdm.tmp2
+    (; expnΔτV, coshΔτt, sinhΔτt, checkerboard_neighbor_table,
+       checkerboard_colors, checkerboard_perm) = fermion_det_matrix
+    v′, u′ = fermion_det_matrix.tmp1, fermion_det_matrix.tmp2
     Δτ = elph.Δτ
     ssh_parameters = elph.ssh_parameters_up
     holstein_parameters = elph.holstein_parameters_up
@@ -171,7 +173,7 @@ function mul_νRe∂M∂x!(
         # iterate over checkerboard colors in reverse order
         for color in Ncolors:-1:1
             # calculate -ν⋅Re[⟨u′|Δτ⋅∂Kc/∂x|v′⟩]
-            _mul_νReΔτ∂Kc∂x!(νRe∂M∂x, -ν, u′, v′, fdm, elph, Δτ, color)
+            _mul_νReΔτ∂Kc∂x!(νRe∂M∂x, -ν, u′, v′, fermion_det_matrix, elph, Δτ, color)
             # |u′⟩ := exp(-Δτ⋅Kc)ᵀ|u′⟩ = exp(-Δτ⋅Kc)|u′⟩
             checkerboard_lmul!(
                 u′, checkerboard_neighbor_table, coshΔτt, sinhΔτt,
@@ -196,13 +198,13 @@ function _mul_νReΔτ∂Kc∂x!(
     ν::E,
     u′::AbstractMatrix,
     v′::AbstractMatrix,
-    fdm::FermionDetMatrix{T,E},
+    fermion_det_matrix::FermionDetMatrix{T,E},
     elph::ElectronPhononParameters{T,E},
     Δτ::E,
     color::Int
 ) where {T<:Number, E<:AbstractFloat}
 
-    (; checkerboard_neighbor_table, checkerboard_colors, checkerboard_perm) = fdm
+    (; checkerboard_neighbor_table, checkerboard_colors, checkerboard_perm) = fermion_det_matrix
     (; x, phonon_parameters) = elph
     ssh_parameters = elph.ssh_parameters_up
     (; α, α2, α3, α4, coupling_to_phonon, hopping_to_couplings) = ssh_parameters

@@ -1,18 +1,18 @@
-@doc raw"""
-    ConjugateGradientSolver{T<:Number, E<:AbstractFloat}
+# @doc raw"""
+#     ConjugateGradientSolver{T<:Number, E<:AbstractFloat}
 
-Type to contain extra storage space in order to avoid performing dynamic memory
-allocations while performing a Conjugate Gradient (CG) solve.
+# Type to contain extra storage space in order to avoid performing dynamic memory
+# allocations while performing a Conjugate Gradient (CG) solve.
 
-# FIELDS
+# # FIELDS
 
-- `maxiter::Int`: Max number of allowed CG iterations.
-- `tol::E`: CG tolerance theshold.
-- `N::Int`: Size of the linear system solver is intended to solve.
-- `r::Vector{T}`: Vector to avoid temporary memory allocations.
-- `p::Vector{T}`: Vector to avoid temporary memory allocations.
-- `v::Vector{T}`: Vector to avoid temporary memory allocations.
-"""
+# - `maxiter::Int`: Max number of allowed CG iterations.
+# - `tol::E`: CG tolerance theshold.
+# - `N::Int`: Size of the linear system solver is intended to solve.
+# - `r::Vector{T}`: Vector to avoid temporary memory allocations.
+# - `p::Vector{T}`: Vector to avoid temporary memory allocations.
+# - `v::Vector{T}`: Vector to avoid temporary memory allocations.
+# """
 struct ConjugateGradientSolver{T<:Number, E<:AbstractFloat}
     
     maxiter::Int
@@ -23,26 +23,26 @@ struct ConjugateGradientSolver{T<:Number, E<:AbstractFloat}
     z::Vector{T}
 end
 
-@doc raw"""
-    ConjugateGradientSolver(
-        # ARGUMENTS
-        v::AbstractArray{T};
-        # KEYWORD ARGUMENTS
-        maxiter::Int = length(z),
-        tol::E = 1e-8
-    ) where {T<:Number, E<:AbstractFloat}
+# @doc raw"""
+#     ConjugateGradientSolver(
+#         # ARGUMENTS
+#         v::AbstractArray{T};
+#         # KEYWORD ARGUMENTS
+#         maxiter::Int = length(z),
+#         tol::E = 1e-8
+#     ) where {T<:Number, E<:AbstractFloat}
 
-Initialize and return an instance of the type [`ConjugateGradientSolver`].
+# Initialize and return an instance of the type [`ConjugateGradientSolver`].
 
-# ARGUMENTS
+# # ARGUMENTS
 
-- `v::AbstractVector{T}`: A sample vector that used to determine the data type and dimension of the linear system to be solve with CG.
+# - `v::AbstractVector{T}`: A sample vector that used to determine the data type and dimension of the linear system to be solve with CG.
 
-# KEYWORD ARGUMENTS
+# # KEYWORD ARGUMENTS
 
-- `maxiter::Int`: Max number of allowed CG iterations.
-- `tol::E = 1e-8`: CG tolerance theshold.
-"""
+# - `maxiter::Int`: Max number of allowed CG iterations.
+# - `tol::E = 1e-8`: CG tolerance theshold.
+# """
 function ConjugateGradientSolver(
     # ARGUMENTS
     v::AbstractArray{T};
@@ -60,36 +60,36 @@ function ConjugateGradientSolver(
 end
 
 
-@doc raw"""
-    cg_solve!(
-        x::AbstractArray{T},
-        A,
-        b::AbstractArray{T},
-        cg_solver::ConjugateGradientSolver{T,E},
-        P::UniformScaling = I;
-        # Keyword Arguments
-        maxiter::Int = cg_solver.maxiter,
-        tol::E = cg_solver.tol
-    ) where {T<:Number, E<:AbstractFloat}
+# @doc raw"""
+#     cg_solve!(
+#         x::AbstractArray{T},
+#         A,
+#         b::AbstractArray{T},
+#         cg_solver::ConjugateGradientSolver{T,E},
+#         P::UniformScaling = I;
+#         # Keyword Arguments
+#         maxiter::Int = cg_solver.maxiter,
+#         tol::E = cg_solver.tol
+#     ) where {T<:Number, E<:AbstractFloat}
 
-    cg_solve!(
-        x::AbstractArray{T},
-        A,
-        b::AbstractArray{T},
-        cg_solver::ConjugateGradientSolver{T,E},
-        P;
-        # Keyword Arguments
-        maxiter::Int = cg_solver.maxiter,
-        tol::E = cg_solver.tol
-    ) where {T<:Number, E<:AbstractFloat}
+#     cg_solve!(
+#         x::AbstractArray{T},
+#         A,
+#         b::AbstractArray{T},
+#         cg_solver::ConjugateGradientSolver{T,E},
+#         P;
+#         # Keyword Arguments
+#         maxiter::Int = cg_solver.maxiter,
+#         tol::E = cg_solver.tol
+#     ) where {T<:Number, E<:AbstractFloat}
 
-Solve ``A \cdot x = b`` using the Conjugate Gradient method with
-```math
-P^{-1} \cdot A \cdot x = P^{-1} \cdot b.
-```
-with a left preconditioner ``P``. The vector ``x`` is modified in-place,
-and the number of iterations and final error returned.
-"""
+# Solve ``A \cdot x = b`` using the Conjugate Gradient method with
+# ```math
+# P^{-1} \cdot A \cdot x = P^{-1} \cdot b.
+# ```
+# with a left preconditioner ``P``. The vector ``x`` is modified in-place,
+# and the number of iterations and final error returned.
+# """
 function cg_solve!(
     x::AbstractArray{T},
     A,

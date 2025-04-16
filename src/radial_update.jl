@@ -1,5 +1,5 @@
 @doc raw"""
-    swap_update!(
+    radial_update!(
         # ARGUMENTS
         electron_phonon_parameters::ElectronPhononParameters{T,E},
         pff_calculator::PFFCalculator{E};
@@ -10,16 +10,17 @@
         preconditioner = I,
         tol::E = fermion_det_matrix.cg.tol,
         maxiter::Int = fermion_det_matrix.cg.maxiter,
-        phonon_type_pairs = nothing
+        phonon_id::Union{Nothing,Int} = nothing,
+        σ::E = 1.0
     ) where {T<:Number, E<:AbstractFloat}
 
-Randomly sample a pairs of phonon modes and exchange the phonon fields associated with the pair of phonon modes.
-The argument `phonon_type_pairs` specifies pairs phonon IDs that are used to randomly samples a pairs of phonon modes.
-If `phonon_type_pairs = nothing`, then all possible pairs of phonon types/IDs are allowed. This function returns a tuple
-containing `(accepted, iters)`, where `accepted` is a boolean indicating whether the update was accepted or rejected, and
-`iters` is the number of CG iterations performed to calculate the fermionic action.
+Perform a radial update to the phonon fields, as described by Algorithm 1 in the paper
+[arXiv:2411.18218](https://arxiv.org/abs/2411.18218).
+Specifically, the proposed update to the phonon fields ``x`` is a rescaling such that
+``x \rightarrow e^{\gamma} x`` where ``\gamma \sim N(0, \sigma/\sqrt{d})`` and ``d`` is
+the number of phonon fields being updated.
 """
-function swap_update!(
+function radial_update!(
     # ARGUMENTS
     electron_phonon_parameters::ElectronPhononParameters{T,E},
     pff_calculator::PFFCalculator{E};
@@ -30,13 +31,15 @@ function swap_update!(
     preconditioner = I,
     tol::E = fermion_det_matrix.cg.tol,
     maxiter::Int = fermion_det_matrix.cg.maxiter,
-    phonon_type_pairs = nothing
+    phonon_id::Union{Nothing,Int} = nothing,
+    σ::E = 1.0
 ) where {T<:Number, E<:AbstractFloat}
 
     phonon_parameters = electron_phonon_parameters.phonon_parameters
     holstein_parameters = electron_phonon_parameters.holstein_parameters_up
     ssh_parameters = electron_phonon_parameters.ssh_parameters_up
     x = electron_phonon_parameters.x
+    M = phonon_parameters.M
 
     # get the mass associated with each phonon
     M = phonon_parameters.M
@@ -50,20 +53,33 @@ function swap_update!(
     # number of unit cells
     Nunitcells = Nphonon ÷ nphonon
 
-    # sample random phonon mode
-    phonon_mode_i, phonon_mode_j = SmoQyDQMC._sample_phonon_mode_pair(rng, nphonon, Nunitcells, M, phonon_type_pairs)
-
     # whether the exponentiated on-site energy matrix needs to be updated with the phonon field,
     # true if phonon mode appears in holstein coupling
-    calculate_exp_V = (phonon_mode_i in holstein_parameters.coupling_to_phonon) || (phonon_mode_j in holstein_parameters.coupling_to_phonon)
+    calculate_exp_V = (holsein_parameters.nholstein > 0)
 
     # whether the exponentiated hopping matrix needs to be updated with the phonon field,
     # true if phonon mode appears in SSH coupling
-    calculate_exp_K = (phonon_mode_i in ssh_parameters.coupling_to_phonon) || (phonon_mode_j in ssh_parameters.coupling_to_phonon)
+    calculate_exp_K = (ssh_parameters.nssh > 0)
 
-    # get the corresponding phonon fields
-    x_i = @view x[phonon_mode_i, :]
-    x_j = @view x[phonon_mode_j, :]
+    # get phonon fields and mass for specified phonon mode if necessary
+    if !isnothing(phonon_id)
+        M′ = @view M[(phonon_id-1)*Nunitcells+1:phonon_id*Nunitcells]
+        x′ = @view x[(phonon_id-1)*Nunitcells+1:phonon_id*Nunitcells, :]
+    else
+        M′ = M
+        x′ = x
+    end
+
+    # number of fields to update, excluding phonon fields that correspond
+    # to phonon modes with infinite mass
+    d = count(m -> isfinite(m), M′)
+
+    # calculate standard deviation for normal distribution
+    σR = σ / sqrt(d)
+
+    # randomly sample expansion/contraction coefficient
+    γ = randn(rng) * σR
+    expγ = exp(γ)
 
     # sample pseudofermion fields and calculate initial fermionic action
     Sf = sample_pseudofermion_fields!(
@@ -84,8 +100,8 @@ function swap_update!(
         SmoQyDQMC.update!(fermion_path_integral, ssh_parameters, x, -1)
     end
 
-    # swap phonon fields
-    SmoQyDQMC.swap!(x_i, x_j)
+    # apply expansion/contraction to phonon fields
+    @. x′ = expγ * x′
 
     # update the fermion path integrals to reflect new phonon field configuration
     if calculate_exp_V
@@ -114,7 +130,7 @@ function swap_update!(
     ΔS = S′ - S
 
     # calculate acceptance probability
-    P = min(1.0, exp(-ΔS))
+    P = min(1.0, exp(-ΔS + d*γ))
 
     # if update is accepted
     if rand(rng) < P
@@ -129,8 +145,8 @@ function swap_update!(
         if calculate_exp_K
             SmoQyDQMC.update!(fermion_path_integral, ssh_parameters, x, -1)
         end
-        # swap phonon fields
-        SmoQyDQMC.swap!(x_i, x_j)
+        # revert to the original phonon configuration
+        @. x′ = x′ / expγ
         # update the fermion path integrals to reflect new phonon field configuration
         if calculate_exp_V
             SmoQyDQMC.update!(fermion_path_integral, holstein_parameters, x, +1)

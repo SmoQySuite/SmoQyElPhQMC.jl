@@ -1,3 +1,7 @@
 [deps]
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
+DocumenterCitations = "daee34ce-89f3-4625-b898-19384cb65244"
+DocumenterInterLinks = "d12716ef-a0f6-4df4-a9f1-a5a34e75c656"
+Literate = "98b081ad-f1c9-55d3-8b20-4c87d4299306"
+SmoQyDQMC = "00e12d65-277b-447e-9c1d-a17422dd36f5"
 SmoQyElPhQMC = "2e896e94-a4a1-44d3-bdd1-72a60ceb4988"
