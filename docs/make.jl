@@ -84,7 +84,7 @@ examples = []
 example_sources = [joinpath(pkgdir(SmoQyElPhQMC, "examples"), example*".jl") for example in examples]
 example_mds = build_examples(example_sources, "examples")
 
-# link to SmoQyDQMC API
+# link to external package APIs
 links = InterLinks(
     "SmoQyDQMC" => "https://smoqysuite.github.io/SmoQyDQMC.jl/stable/",
     "LatticeUtilities" => "https://smoqysuite.github.io/LatticeUtilities.jl/stable/"

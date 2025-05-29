@@ -4,7 +4,7 @@ EditURL = "../../../tutorials/holstein_honeycomb.jl"
 
 Download this example as a [Julia script](../assets/scripts/tutorials/holstein_honeycomb.jl).
 
-# Honeycomb Holstein Model
+# 1a) Honeycomb Holstein Model
 
 In this example we reimplement the
 [SmoQyDQMC tuturial](https://smoqysuite.github.io/SmoQyDQMC.jl/stable/tutorials/holstein_honeycomb/)
@@ -101,7 +101,14 @@ Think of the `additional_info` dictionary as a place to record any additional in
 
     # Initialize the directory the data will be written to.
     initialize_datafolder(simulation_info)
+````
 
+## Initialize simulation metadata
+In this section of the code we record important metadata about the simulation, including initializing the random number
+generator that will be used throughout the simulation.
+The important metadata within the simulation will be recorded in the `metadata` dictionary.
+
+````julia
     # Initialize random number generator
     rng = Xoshiro(seed)
 
@@ -117,6 +124,24 @@ Think of the `additional_info` dictionary as a place to record any additional in
     additional_info["Nt"]        = Nt         # Number of time-steps in HMC update
     additional_info["Nrv"]       = Nrv        # Number of random vectors used to estimate fermionic correlation functions
     additional_info["seed"]      = seed       # Random seed used to initialize random number generator in simulation
+````
+
+Here we also update variables to keep track of the acceptance rates for the various types of Monte Carlo updates
+that will be performed during the simulation. This will be discussed in more detail in later sections of the tutorial.
+
+````julia
+    metadata["hmc_acceptance_rate"] = 0.0
+    metadata["reflection_acceptance_rate"] = 0.0
+    metadata["swap_acceptance_rate"] = 0.0
+````
+
+Initialize variables to record the average number of CG iterations for each type of update and measurements.
+
+````julia
+    additional_info["hmc_iters"] = 0.0
+    additional_info["reflection_iters"] = 0.0
+    additional_info["swap_iters"] = 0.0
+    additional_info["measurement_iters"] = 0.0
 ````
 
 ## Initialize model
@@ -557,21 +582,8 @@ The next section of code performs updates to thermalize the system prior to begi
 In addition to EFA-HMC updates that will be performed using the [`EFAPFFHMCUpdater`](@ref) type initialized above and
 the [`hmc_update!`](@ref) function below, we will also perform reflection and swap updates using the
 [`reflection_update!`](@ref) and [`swap_update!`](@ref) functions respectively.
-We will additionally initialize variables to keep track of the acceptance rate for these three types of updates.
 
 ````julia
-    # Initialize variables to record acceptance rates for various udpates.
-    additional_info["hmc_acceptance_rate"] = 0.0
-    additional_info["reflection_acceptance_rate"] = 0.0
-    additional_info["swap_acceptance_rate"] = 0.0
-
-    # Initialize variables to record the average number of CG iterations
-    # for each type of update and measurements.
-    additional_info["hmc_iters"] = 0.0
-    additional_info["reflection_iters"] = 0.0
-    additional_info["swap_iters"] = 0.0
-    additional_info["measurement_iters"] = 0.0
-
     # Iterate over number of thermalization updates to perform.
     for n in 1:N_therm
 
@@ -634,83 +646,83 @@ structure of this part of the code, refer to here.
     bin_size = N_updates ÷ N_bins
 
     # Iterate over bins.
-    for bin in 1:N_bins
+    for update in 1:N_updates
 
-        # Iterate over update sweeps and measurements in bin.
-        for n in 1:bin_size
-
-            # Perform a reflection update.
-            (accepted, iters) = reflection_update!(
-                electron_phonon_parameters, pff_calculator,
-                fermion_path_integral = fermion_path_integral,
-                fermion_det_matrix = fermion_det_matrix,
-                preconditioner = kpm_preconditioner,
-                rng = rng, tol = tol, maxiter = maxiter
-            )
-
-            # Record whether the reflection update was accepted or rejected.
-            additional_info["reflection_acceptance_rate"] += accepted
-
-            # Record the number of CG iterations performed for the reflection update.
-            additional_info["reflection_iters"] += iters
-
-            # Perform a swap update.
-            (accepted, iters) = swap_update!(
-                electron_phonon_parameters, pff_calculator,
-                fermion_path_integral = fermion_path_integral,
-                fermion_det_matrix = fermion_det_matrix,
-                preconditioner = kpm_preconditioner,
-                rng = rng, tol = tol, maxiter = maxiter
-            )
-
-            # Record whether the reflection update was accepted or rejected.
-            additional_info["swap_acceptance_rate"] += accepted
-
-            # Record the number of CG iterations performed for the reflection update.
-            additional_info["swap_iters"] += iters
-
-            # Perform an HMC update.
-            (accepted, iters) = hmc_update!(
-                electron_phonon_parameters, hmc_updater,
-                fermion_path_integral = fermion_path_integral,
-                fermion_det_matrix = fermion_det_matrix,
-                pff_calculator = pff_calculator,
-                preconditioner = kpm_preconditioner,
-                tol_action = tol, tol_force = sqrt(tol), maxiter = maxiter,
-                rng = rng,
-            )
-
-            # Record whether the reflection update was accepted or rejected.
-            additional_info["hmc_acceptance_rate"] += accepted
-
-            # Record the average number of iterations per CG solve for hmc update.
-            additional_info["hmc_iters"] += iters
-
-            # Make measurements.
-            iters = make_measurements!(
-                measurement_container, fermion_det_matrix, greens_estimator,
-                model_geometry = model_geometry,
-                fermion_path_integral = fermion_path_integral,
-                tight_binding_parameters = tight_binding_parameters,
-                electron_phonon_parameters = electron_phonon_parameters,
-                preconditioner = kpm_preconditioner,
-                tol = tol, maxiter = maxiter,
-                rng = rng
-            )
-
-            # Record the average number of iterations per CG solve for measurements.
-            additional_info["measurement_iters"] += iters
-        end
-
-        # Write the bin-averaged measurements to file.
-        write_measurements!(
-            measurement_container = measurement_container,
-            simulation_info = simulation_info,
-            model_geometry = model_geometry,
-            bin = bin,
-            bin_size = bin_size,
-            Δτ = Δτ
+        # Perform a reflection update.
+        (accepted, iters) = reflection_update!(
+            electron_phonon_parameters, pff_calculator,
+            fermion_path_integral = fermion_path_integral,
+            fermion_det_matrix = fermion_det_matrix,
+            preconditioner = kpm_preconditioner,
+            rng = rng, tol = tol, maxiter = maxiter
         )
+
+        # Record whether the reflection update was accepted or rejected.
+        additional_info["reflection_acceptance_rate"] += accepted
+
+        # Record the number of CG iterations performed for the reflection update.
+        additional_info["reflection_iters"] += iters
+
+        # Perform a swap update.
+        (accepted, iters) = swap_update!(
+            electron_phonon_parameters, pff_calculator,
+            fermion_path_integral = fermion_path_integral,
+            fermion_det_matrix = fermion_det_matrix,
+            preconditioner = kpm_preconditioner,
+            rng = rng, tol = tol, maxiter = maxiter
+        )
+
+        # Record whether the reflection update was accepted or rejected.
+        additional_info["swap_acceptance_rate"] += accepted
+
+        # Record the number of CG iterations performed for the reflection update.
+        additional_info["swap_iters"] += iters
+
+        # Perform an HMC update.
+        (accepted, iters) = hmc_update!(
+            electron_phonon_parameters, hmc_updater,
+            fermion_path_integral = fermion_path_integral,
+            fermion_det_matrix = fermion_det_matrix,
+            pff_calculator = pff_calculator,
+            preconditioner = kpm_preconditioner,
+            tol_action = tol, tol_force = sqrt(tol), maxiter = maxiter,
+            rng = rng,
+        )
+
+        # Record whether the reflection update was accepted or rejected.
+        additional_info["hmc_acceptance_rate"] += accepted
+
+        # Record the average number of iterations per CG solve for hmc update.
+        additional_info["hmc_iters"] += iters
+
+        # Make measurements.
+        iters = make_measurements!(
+            measurement_container, fermion_det_matrix, greens_estimator,
+            model_geometry = model_geometry,
+            fermion_path_integral = fermion_path_integral,
+            tight_binding_parameters = tight_binding_parameters,
+            electron_phonon_parameters = electron_phonon_parameters,
+            preconditioner = kpm_preconditioner,
+            tol = tol, maxiter = maxiter,
+            rng = rng
+        )
+
+        # Record the average number of iterations per CG solve for measurements.
+        additional_info["measurement_iters"] += iters
+
+        # Check if bin averaged measurements need to be written to file.
+        if update % bin_size == 0
+
+            # Write the bin-averaged measurements to file.
+            write_measurements!(
+                measurement_container = measurement_container,
+                simulation_info = simulation_info,
+                model_geometry = model_geometry,
+                bin = update ÷ bin_size,
+                bin_size = bin_size,
+                Δτ = Δτ
+            )
+        end
     end
 ````
 
@@ -744,7 +756,7 @@ For more information refer to here.
 ````julia
     # Process the simulation results, calculating final error bars for all measurements,
     # writing final statisitics to CSV files.
-    process_measurements(simulation_info.datafolder, N_bins)
+    process_measurements(simulation_info.datafolder, N_bins, time_displaced = false)
 
     # Merge binary files containing binned data into a single file.
     compress_jld2_bins(folder = simulation_info.datafolder)

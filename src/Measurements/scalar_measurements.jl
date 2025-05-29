@@ -100,7 +100,7 @@ function measure_double_occ(
     for i in 1:(Nrv-1)
         GRup = selectdim(GR, ndims(GR), i)
         Rtup = selectdim(Rt, ndims(Rt), i)
-        for j in i:Nrv
+        for j in (i+1):Nrv
             GRdn = selectdim(GR, ndims(GR), j)
             Rtdn = selectdim(Rt, ndims(Rt), j)
             # ⟨n₊n₋⟩ = ⟨(1-G₊(0))⋅(1-G₋(0))⟩
