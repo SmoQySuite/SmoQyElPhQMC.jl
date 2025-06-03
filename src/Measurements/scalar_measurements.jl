@@ -29,37 +29,87 @@ end
 
 # measure ⟨N²⟩ globally
 function measure_Nsqrd(
-    greens_estimator::GreensEstimator
-)
+    greens_estimator::GreensEstimator{T}
+) where {T}
 
-    (; V, N, n, Lτ, Nrv, Rt, GR) = greens_estimator
+    (; V, N, n, Lτ, Nrv, Rt, GR, CΔ0, pfft!, pifft!) = greens_estimator
+    Gl = greens_estimator.A
+    Gr = greens_estimator.B
+
+    # n is number of obritals per unit cell
+    # N is number of unit cells
+    # Lτ is length of imaginary time axis
+    # V is the total space-time volume
+    # Nrv is the number of random vectors
+
+    # get original random vectors
     R = Rt
     @. R = conj(Rt)
 
-    # N is number of unit cells
-    # Lτ is length of imaginary time axis
-    # Nrv is the number of random vectors
+    # reshape in to matrix where columns correspond to random vectors
+    R′ = reshape(R, V, Nrv)
+    GR′ = reshape(GR, V, Nrv)
 
-    # approximate ⟨nₛ⟩
-    ns = measure_n(greens_estimator)
+    # measure ⟨N⟩²
+    N̄sqrd = zero(Complex{T})
+    # iterate over first random vector
+    for i in 1:(Nrv-1)
+        Ri = @view R′[:,i]
+        GRi = @view GR′[:,i]
+        # approximate TrG
+        TrGi = dot(Ri, GRi)
+        # iterate over second random variable
+        for j in (i+1):Nrv
+            Rj = @view R′[:,j]
+            GRj = @view GR′[:,j]
+            # approximate TrG
+            TrGj = dot(Rj, GRj)
+            # approximate ⟨N⟩² = 4⋅(Tr[I]-Tr[G])⋅(Tr[I]-Tr[G])/Lτ²
+            # using two indpendent random vectors where Tr[I] = V
+            N̄sqrd +=  4 * (V - TrGi) * (V - TrGj) / Lτ^2
+        end
+    end
+    N̄sqrd /= binomial(Nrv, 2)
 
-    # calculate ⟨Nₛ⟩ = N⋅n⋅⟨nₛ⟩
-    Ns = (N*n)*ns
-
-    # approximate ⟨N⟩² = ⟨(N₊+N₋)⟩² = ⟨(2⋅Nₛ)⟩² = 4⟨Nₛ⟩²
-    N2 = 4*Ns^2
-
-    # approximate Tr[G] ≈ ⟨R|GR⟩ / (Nrv*Lτ)
-    TrG = dot(R, GR)/(Nrv*Lτ)
-
-    # approximate Tr[G²] ≈ ⟨GR|GR⟩ / (Nrv*Lτ)
-    TrGsqrd = dot(GR, GR)/(Nrv*Lτ)
-
-    # approximate ⟨N²⟩ = ⟨N⟩² + 2⋅Tr[G] - 2⋅Tr[G²]
-    Nsqrd = N2 + 2*TrG - 2*TrGsqrd
+    # calculate Tr[G]
+    TrG = dot(R, GR) / (Nrv * Lτ)
 
     # restore conjugated random vectors
     @. Rt = conj(R)
+
+    # measure Tr[G²]
+    TrGsqrd = zero(Complex{T})
+    # iterate over pairs of orbitals
+    for a in 1:n
+        for b in 1:n
+            GR_a = selectdim(GR, 2, a)
+            Rt_b = selectdim(Rt, 2, b)
+            GR_b = selectdim(GR, 2, b)
+            Rt_a = selectdim(Rt, 2, a)
+            fill!(CΔ0, 0)
+            # iterate over pairs of random vectors
+            for i in 1:(Nrv-1)
+                for j in (i+1):Nrv
+                    # get views for appropriate random vectors
+                    GR_a_i = selectdim(GR_a, ndims(GR_a), i)
+                    Rt_b_i = selectdim(Rt_b, ndims(Rt_b), i)
+                    GR_b_j = selectdim(GR_b, ndims(GR_b), j)
+                    Rt_a_j = selectdim(Rt_a, ndims(Rt_a), j)
+                    # calculate G(0,τ)⋅G(τ,0)
+                    _measure_CΔ0!(
+                        CΔ0, Gl, Gr,
+                        GR_b_j, Rt_b_i, Rt_a_j, GR_a_i,
+                        pfft!, pifft!
+                    )
+                end
+            end
+            G0G0 = selectdim(CΔ0, 1, 1)
+            TrGsqrd += N * sum(G0G0) / binomial(Nrv, 2)
+        end
+    end
+
+    # calculate ⟨N²⟩
+    Nsqrd = N̄sqrd + 2*TrG - 2*TrGsqrd
 
     return Nsqrd
 end

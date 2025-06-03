@@ -904,7 +904,7 @@ function copyto_composite_correlation_container!(
     end
 
     # fourier transform to momentum space
-    fourier_transform!(tmp, a, b, unit_cell, lattice)
+    fourier_transform!(tmp, a, b, D+1, unit_cell, lattice)
 
     # record equal-time structure factor measurements
     if measurement in keys(equaltime_composite_correlations)
