@@ -56,6 +56,15 @@ function run_simulation(;
     additional_info["Nrv"]       = Nrv        # Number of random vectors used to estimate fermionic correlation functions
     additional_info["seed"]      = seed       # Random seed used to initialize random number generator in simulation
 
+    metadata["hmc_acceptance_rate"] = 0.0
+    metadata["reflection_acceptance_rate"] = 0.0
+    metadata["swap_acceptance_rate"] = 0.0
+
+    additional_info["hmc_iters"] = 0.0
+    additional_info["reflection_iters"] = 0.0
+    additional_info["swap_iters"] = 0.0
+    additional_info["measurement_iters"] = 0.0
+
     # Define the unit cell.
     unit_cell = lu.UnitCell(
         lattice_vecs = [[3/2,√3/2],
@@ -306,18 +315,6 @@ function run_simulation(;
         δ = 0.05 # Fractional max amplitude of noise added to time-step Δt before each HMC update.
     )
 
-    # Initialize variables to record acceptance rates for various udpates.
-    additional_info["hmc_acceptance_rate"] = 0.0
-    additional_info["reflection_acceptance_rate"] = 0.0
-    additional_info["swap_acceptance_rate"] = 0.0
-
-    # Initialize variables to record the average number of CG iterations
-    # for each type of update and measurements.
-    additional_info["hmc_iters"] = 0.0
-    additional_info["reflection_iters"] = 0.0
-    additional_info["swap_iters"] = 0.0
-    additional_info["measurement_iters"] = 0.0
-
     # Iterate over number of thermalization updates to perform.
     for n in 1:N_therm
 
@@ -373,83 +370,83 @@ function run_simulation(;
     bin_size = N_updates ÷ N_bins
 
     # Iterate over bins.
-    for bin in 1:N_bins
+    for update in 1:N_updates
 
-        # Iterate over update sweeps and measurements in bin.
-        for n in 1:bin_size
-
-            # Perform a reflection update.
-            (accepted, iters) = reflection_update!(
-                electron_phonon_parameters, pff_calculator,
-                fermion_path_integral = fermion_path_integral,
-                fermion_det_matrix = fermion_det_matrix,
-                preconditioner = kpm_preconditioner,
-                rng = rng, tol = tol, maxiter = maxiter
-            )
-
-            # Record whether the reflection update was accepted or rejected.
-            additional_info["reflection_acceptance_rate"] += accepted
-
-            # Record the number of CG iterations performed for the reflection update.
-            additional_info["reflection_iters"] += iters
-
-            # Perform a swap update.
-            (accepted, iters) = swap_update!(
-                electron_phonon_parameters, pff_calculator,
-                fermion_path_integral = fermion_path_integral,
-                fermion_det_matrix = fermion_det_matrix,
-                preconditioner = kpm_preconditioner,
-                rng = rng, tol = tol, maxiter = maxiter
-            )
-
-            # Record whether the reflection update was accepted or rejected.
-            additional_info["swap_acceptance_rate"] += accepted
-
-            # Record the number of CG iterations performed for the reflection update.
-            additional_info["swap_iters"] += iters
-
-            # Perform an HMC update.
-            (accepted, iters) = hmc_update!(
-                electron_phonon_parameters, hmc_updater,
-                fermion_path_integral = fermion_path_integral,
-                fermion_det_matrix = fermion_det_matrix,
-                pff_calculator = pff_calculator,
-                preconditioner = kpm_preconditioner,
-                tol_action = tol, tol_force = sqrt(tol), maxiter = maxiter,
-                rng = rng,
-            )
-
-            # Record whether the reflection update was accepted or rejected.
-            additional_info["hmc_acceptance_rate"] += accepted
-
-            # Record the average number of iterations per CG solve for hmc update.
-            additional_info["hmc_iters"] += iters
-
-            # Make measurements.
-            iters = make_measurements!(
-                measurement_container, fermion_det_matrix, greens_estimator,
-                model_geometry = model_geometry,
-                fermion_path_integral = fermion_path_integral,
-                tight_binding_parameters = tight_binding_parameters,
-                electron_phonon_parameters = electron_phonon_parameters,
-                preconditioner = kpm_preconditioner,
-                tol = tol, maxiter = maxiter,
-                rng = rng
-            )
-
-            # Record the average number of iterations per CG solve for measurements.
-            additional_info["measurement_iters"] += iters
-        end
-
-        # Write the bin-averaged measurements to file.
-        write_measurements!(
-            measurement_container = measurement_container,
-            simulation_info = simulation_info,
-            model_geometry = model_geometry,
-            bin = bin,
-            bin_size = bin_size,
-            Δτ = Δτ
+        # Perform a reflection update.
+        (accepted, iters) = reflection_update!(
+            electron_phonon_parameters, pff_calculator,
+            fermion_path_integral = fermion_path_integral,
+            fermion_det_matrix = fermion_det_matrix,
+            preconditioner = kpm_preconditioner,
+            rng = rng, tol = tol, maxiter = maxiter
         )
+
+        # Record whether the reflection update was accepted or rejected.
+        additional_info["reflection_acceptance_rate"] += accepted
+
+        # Record the number of CG iterations performed for the reflection update.
+        additional_info["reflection_iters"] += iters
+
+        # Perform a swap update.
+        (accepted, iters) = swap_update!(
+            electron_phonon_parameters, pff_calculator,
+            fermion_path_integral = fermion_path_integral,
+            fermion_det_matrix = fermion_det_matrix,
+            preconditioner = kpm_preconditioner,
+            rng = rng, tol = tol, maxiter = maxiter
+        )
+
+        # Record whether the reflection update was accepted or rejected.
+        additional_info["swap_acceptance_rate"] += accepted
+
+        # Record the number of CG iterations performed for the reflection update.
+        additional_info["swap_iters"] += iters
+
+        # Perform an HMC update.
+        (accepted, iters) = hmc_update!(
+            electron_phonon_parameters, hmc_updater,
+            fermion_path_integral = fermion_path_integral,
+            fermion_det_matrix = fermion_det_matrix,
+            pff_calculator = pff_calculator,
+            preconditioner = kpm_preconditioner,
+            tol_action = tol, tol_force = sqrt(tol), maxiter = maxiter,
+            rng = rng,
+        )
+
+        # Record whether the reflection update was accepted or rejected.
+        additional_info["hmc_acceptance_rate"] += accepted
+
+        # Record the average number of iterations per CG solve for hmc update.
+        additional_info["hmc_iters"] += iters
+
+        # Make measurements.
+        iters = make_measurements!(
+            measurement_container, fermion_det_matrix, greens_estimator,
+            model_geometry = model_geometry,
+            fermion_path_integral = fermion_path_integral,
+            tight_binding_parameters = tight_binding_parameters,
+            electron_phonon_parameters = electron_phonon_parameters,
+            preconditioner = kpm_preconditioner,
+            tol = tol, maxiter = maxiter,
+            rng = rng
+        )
+
+        # Record the average number of iterations per CG solve for measurements.
+        additional_info["measurement_iters"] += iters
+
+        # Check if bin averaged measurements need to be written to file.
+        if update % bin_size == 0
+
+            # Write the bin-averaged measurements to file.
+            write_measurements!(
+                measurement_container = measurement_container,
+                simulation_info = simulation_info,
+                model_geometry = model_geometry,
+                bin = update ÷ bin_size,
+                bin_size = bin_size,
+                Δτ = Δτ
+            )
+        end
     end
 
     # Calculate acceptance rates.
