@@ -32,9 +32,7 @@ function measure_Nsqrd(
     greens_estimator::GreensEstimator{T}
 ) where {T}
 
-    (; V, N, n, Lτ, Nrv, Rt, GR, CΔ0, pfft!, pifft!) = greens_estimator
-    Gl = greens_estimator.A
-    Gr = greens_estimator.B
+    (; V, N, n, Lτ, Nrv, Rt, GR) = greens_estimator
 
     # n is number of obritals per unit cell
     # N is number of unit cells
@@ -74,42 +72,24 @@ function measure_Nsqrd(
     # calculate Tr[G]
     TrG = dot(R, GR) / (Nrv * Lτ)
 
-    # restore conjugated random vectors
-    @. Rt = conj(R)
-
-    # measure Tr[G²]
     TrGsqrd = zero(Complex{T})
-    # iterate over pairs of orbitals
-    for a in 1:n
-        for b in 1:n
-            GR_a = selectdim(GR, 2, a)
-            Rt_b = selectdim(Rt, 2, b)
-            GR_b = selectdim(GR, 2, b)
-            Rt_a = selectdim(Rt, 2, a)
-            fill!(CΔ0, 0)
-            # iterate over pairs of random vectors
-            for i in 1:(Nrv-1)
-                for j in (i+1):Nrv
-                    # get views for appropriate random vectors
-                    GR_a_i = selectdim(GR_a, ndims(GR_a), i)
-                    Rt_b_i = selectdim(Rt_b, ndims(Rt_b), i)
-                    GR_b_j = selectdim(GR_b, ndims(GR_b), j)
-                    Rt_a_j = selectdim(Rt_a, ndims(Rt_a), j)
-                    # calculate G(0,τ)⋅G(τ,0)
-                    _measure_CΔ0!(
-                        CΔ0, Gl, Gr,
-                        GR_b_j, Rt_b_i, Rt_a_j, GR_a_i,
-                        pfft!, pifft!
-                    )
-                end
-            end
-            G0G0 = selectdim(CΔ0, 1, 1)
-            TrGsqrd += N * sum(G0G0) / binomial(Nrv, 2)
+    # iterate over first random vector
+    for i in 1:(Nrv-1)
+        Ri = @view R′[:,i]
+        GRi = @view GR′[:,i]
+        # iterate over second random variable
+        for j in (i+1):Nrv
+            Rj = @view R′[:,j]
+            GRj = @view GR′[:,j]
+            TrGsqrd += dot(Rj,GRi) * dot(Ri,GRj) / Lτ^2
         end
     end
+    TrGsqrd /= binomial(Nrv, 2)
 
-    # calculate ⟨N²⟩
-    Nsqrd = N̄sqrd + 2*TrG - 2*TrGsqrd
+    Nsqrd = N̄sqrd + 2*TrG/Lτ - 2*TrGsqrd
+
+    # restore conjugated random vectors
+    @. Rt = conj(R)
 
     return Nsqrd
 end
