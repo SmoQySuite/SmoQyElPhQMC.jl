@@ -72,11 +72,11 @@ function run_simulation(;
 
 # ## Initialize simulation
 # In this first part of the script we name and initialize our simulation, creating the data folder our simulation results will be written to.
-# This is done by initializing an instances of the [`SmoQyDQMC.SimulationInfo`](@extref) type, as well as an `additional_info` dictionary where we will store useful metadata about the simulation.
+# This is done by initializing an instances of the [`SmoQyDQMC.SimulationInfo`](@extref) type, as well as an `metadata` dictionary where we will store useful metadata about the simulation.
 # Finally, the integer `seed` is used to initialize the random number generator `rng` that will be used to generate random numbers throughout the rest of the simulation.
 
-# Next we record relevant simulation parameters to the `additional_info` dictionary.
-# Think of the `additional_info` dictionary as a place to record any additional information during the simulation that will not otherwise be automatically recorded and written to file.
+# Next we record relevant simulation parameters to the `metadata` dictionary.
+# Think of the `metadata` dictionary as a place to record any additional information during the simulation that will not otherwise be automatically recorded and written to file.
 
     ## Construct the foldername the data will be written to.
     datafolder_prefix = @sprintf "holstein_honeycomb_w%.2f_a%.2f_mu%.2f_L%d_b%.2f" Ω α μ L β
@@ -100,27 +100,27 @@ function run_simulation(;
     rng = Xoshiro(seed)
 
     ## Initialize additiona_info dictionary
-    additional_info = Dict()
+    metadata = Dict()
 
     ## Record simulation parameters.
-    additional_info["N_therm"]   = N_therm    # Number of thermalization updates
-    additional_info["N_updates"] = N_updates  # Total number of measurements and measurement updates
-    additional_info["N_bins"]    = N_bins     # Number of times bin-averaged measurements are written to file
-    additional_info["maxiter"]   = maxiter    # Maximum number of conjugate gradient iterations
-    additional_info["tol"]       = tol        # Tolerance used for conjugate gradient solves
-    additional_info["Nt"]        = Nt         # Number of time-steps in HMC update
-    additional_info["Nrv"]       = Nrv        # Number of random vectors used to estimate fermionic correlation functions
-    additional_info["seed"]      = seed       # Random seed used to initialize random number generator in simulation
+    metadata["N_therm"]   = N_therm    # Number of thermalization updates
+    metadata["N_updates"] = N_updates  # Total number of measurements and measurement updates
+    metadata["N_bins"]    = N_bins     # Number of times bin-averaged measurements are written to file
+    metadata["maxiter"]   = maxiter    # Maximum number of conjugate gradient iterations
+    metadata["tol"]       = tol        # Tolerance used for conjugate gradient solves
+    metadata["Nt"]        = Nt         # Number of time-steps in HMC update
+    metadata["Nrv"]       = Nrv        # Number of random vectors used to estimate fermionic correlation functions
+    metadata["seed"]      = seed       # Random seed used to initialize random number generator in simulation
 # Here we also update variables to keep track of the acceptance rates for the various types of Monte Carlo updates
 # that will be performed during the simulation. This will be discussed in more detail in later sections of the tutorial.
     metadata["hmc_acceptance_rate"] = 0.0
     metadata["reflection_acceptance_rate"] = 0.0
     metadata["swap_acceptance_rate"] = 0.0
 # Initialize variables to record the average number of CG iterations for each type of update and measurements.
-    additional_info["hmc_iters"] = 0.0
-    additional_info["reflection_iters"] = 0.0
-    additional_info["swap_iters"] = 0.0
-    additional_info["measurement_iters"] = 0.0
+    metadata["hmc_iters"] = 0.0
+    metadata["reflection_iters"] = 0.0
+    metadata["swap_iters"] = 0.0
+    metadata["measurement_iters"] = 0.0
 
 # ## Initialize model
 # The next step is define the model we wish to simulate.
@@ -539,10 +539,10 @@ function run_simulation(;
         )
 
         ## Record whether the reflection update was accepted or rejected.
-        additional_info["reflection_acceptance_rate"] += accepted
+        metadata["reflection_acceptance_rate"] += accepted
 
         ## Record the number of CG iterations performed for the reflection update.
-        additional_info["reflection_iters"] += iters
+        metadata["reflection_iters"] += iters
 
         ## Perform a swap update.
         (accepted, iters) = swap_update!(
@@ -554,10 +554,10 @@ function run_simulation(;
         )
 
         ## Record whether the reflection update was accepted or rejected.
-        additional_info["swap_acceptance_rate"] += accepted
+        metadata["swap_acceptance_rate"] += accepted
 
         ## Record the number of CG iterations performed for the reflection update.
-        additional_info["swap_iters"] += iters
+        metadata["swap_iters"] += iters
 
         ## Perform an HMC update.
         (accepted, iters) = hmc_update!(
@@ -571,10 +571,10 @@ function run_simulation(;
         )
 
         ## Record the average number of iterations per CG solve for hmc update.
-        additional_info["hmc_acceptance_rate"] += accepted
+        metadata["hmc_acceptance_rate"] += accepted
 
         ## Record the number of CG iterations performed for the reflection update.
-        additional_info["hmc_iters"] += iters
+        metadata["hmc_iters"] += iters
     end
 
 # ## Make measurements
@@ -598,10 +598,10 @@ function run_simulation(;
         )
 
         ## Record whether the reflection update was accepted or rejected.
-        additional_info["reflection_acceptance_rate"] += accepted
+        metadata["reflection_acceptance_rate"] += accepted
 
         ## Record the number of CG iterations performed for the reflection update.
-        additional_info["reflection_iters"] += iters
+        metadata["reflection_iters"] += iters
 
         ## Perform a swap update.
         (accepted, iters) = swap_update!(
@@ -613,10 +613,10 @@ function run_simulation(;
         )
 
         ## Record whether the reflection update was accepted or rejected.
-        additional_info["swap_acceptance_rate"] += accepted
+        metadata["swap_acceptance_rate"] += accepted
 
         ## Record the number of CG iterations performed for the reflection update.
-        additional_info["swap_iters"] += iters
+        metadata["swap_iters"] += iters
 
         ## Perform an HMC update.
         (accepted, iters) = hmc_update!(
@@ -630,10 +630,10 @@ function run_simulation(;
         )
 
         ## Record whether the reflection update was accepted or rejected.
-        additional_info["hmc_acceptance_rate"] += accepted
+        metadata["hmc_acceptance_rate"] += accepted
 
         ## Record the average number of iterations per CG solve for hmc update.
-        additional_info["hmc_iters"] += iters
+        metadata["hmc_iters"] += iters
 
         ## Make measurements.
         iters = make_measurements!(
@@ -648,7 +648,7 @@ function run_simulation(;
         )
 
         ## Record the average number of iterations per CG solve for measurements.
-        additional_info["measurement_iters"] += iters
+        metadata["measurement_iters"] += iters
 
         ## Check if bin averaged measurements need to be written to file.
         if update % bin_size == 0
@@ -669,21 +669,21 @@ function run_simulation(;
 # At this point we are done sampling and taking measurements.
 # Next, we want to calculate the final acceptance rate for the various types of
 # udpates we performed, as well as write the simulation metadata to file,
-# including the contents of the `additional_info` dictionary.
+# including the contents of the `metadata` dictionary.
 
     ## Calculate acceptance rates.
-    additional_info["hmc_acceptance_rate"] /= (N_updates + N_therm)
-    additional_info["reflection_acceptance_rate"] /= (N_updates + N_therm)
-    additional_info["swap_acceptance_rate"] /= (N_updates + N_therm)
+    metadata["hmc_acceptance_rate"] /= (N_updates + N_therm)
+    metadata["reflection_acceptance_rate"] /= (N_updates + N_therm)
+    metadata["swap_acceptance_rate"] /= (N_updates + N_therm)
 
     ## Calculate average number of CG iterations.
-    additional_info["hmc_iters"] /= (N_updates + N_therm)
-    additional_info["reflection_iters"] /= (N_updates + N_therm)
-    additional_info["swap_iters"] /= (N_updates + N_therm)
-    additional_info["measurement_iters"] /= N_updates
+    metadata["hmc_iters"] /= (N_updates + N_therm)
+    metadata["reflection_iters"] /= (N_updates + N_therm)
+    metadata["swap_iters"] /= (N_updates + N_therm)
+    metadata["measurement_iters"] /= N_updates
 
     ## Write simulation metadata to simulation_info.toml file.
-    save_simulation_info(simulation_info, additional_info)
+    save_simulation_info(simulation_info, metadata)
 
 # ## Process results
 # In this final section of code we process the binned data, calculating final estimates for the mean and error of all measured observables.

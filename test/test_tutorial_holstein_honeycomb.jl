@@ -5,7 +5,7 @@
     
     @test isnothing(
         run_simulation(
-            sID       = 1,
+            sID       = rand(Int),
             Ω         = 1.0,
             α         = 1.0,
             μ         = 0.0,
