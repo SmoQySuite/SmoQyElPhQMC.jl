@@ -29,7 +29,7 @@ function run_simulation(;
     maxiter = 1000, # Maximum number of CG iterations.
     seed = abs(rand(Int)), # Seed for random number generator.
     filepath = &quot;.&quot; # Filepath to where data folder will be created.
-)</code></pre><h2 id="Initialize-simulation"><a class="docs-heading-anchor" href="#Initialize-simulation">Initialize simulation</a><a id="Initialize-simulation-1"></a><a class="docs-heading-anchor-permalink" href="#Initialize-simulation" title="Permalink"></a></h2><p>In this first part of the script we name and initialize our simulation, creating the data folder our simulation results will be written to. This is done by initializing an instances of the <a href="https://smoqysuite.github.io/SmoQyDQMC.jl/stable/api/#SmoQyDQMC.SimulationInfo-Tuple%7B%7D"><code>SmoQyDQMC.SimulationInfo</code></a> type, as well as an <code>additional_info</code> dictionary where we will store useful metadata about the simulation. Finally, the integer <code>seed</code> is used to initialize the random number generator <code>rng</code> that will be used to generate random numbers throughout the rest of the simulation.</p><p>Next we record relevant simulation parameters to the <code>additional_info</code> dictionary. Think of the <code>additional_info</code> dictionary as a place to record any additional information during the simulation that will not otherwise be automatically recorded and written to file.</p><pre><code class="language-julia hljs">    # Construct the foldername the data will be written to.
+)</code></pre><h2 id="Initialize-simulation"><a class="docs-heading-anchor" href="#Initialize-simulation">Initialize simulation</a><a id="Initialize-simulation-1"></a><a class="docs-heading-anchor-permalink" href="#Initialize-simulation" title="Permalink"></a></h2><p>In this first part of the script we name and initialize our simulation, creating the data folder our simulation results will be written to. This is done by initializing an instances of the <a href="https://smoqysuite.github.io/SmoQyDQMC.jl/stable/api/#SmoQyDQMC.SimulationInfo-Tuple%7B%7D"><code>SmoQyDQMC.SimulationInfo</code></a> type, as well as an <code>metadata</code> dictionary where we will store useful metadata about the simulation. Finally, the integer <code>seed</code> is used to initialize the random number generator <code>rng</code> that will be used to generate random numbers throughout the rest of the simulation.</p><p>Next we record relevant simulation parameters to the <code>metadata</code> dictionary. Think of the <code>metadata</code> dictionary as a place to record any additional information during the simulation that will not otherwise be automatically recorded and written to file.</p><pre><code class="language-julia hljs">    # Construct the foldername the data will be written to.
     datafolder_prefix = @sprintf &quot;holstein_honeycomb_w%.2f_a%.2f_mu%.2f_L%d_b%.2f&quot; Ω α μ L β
 
     # Initialize simulation info.
@@ -44,22 +44,22 @@ function run_simulation(;
     rng = Xoshiro(seed)
 
     # Initialize additiona_info dictionary
-    additional_info = Dict()
+    metadata = Dict()
 
     # Record simulation parameters.
-    additional_info[&quot;N_therm&quot;]   = N_therm    # Number of thermalization updates
-    additional_info[&quot;N_updates&quot;] = N_updates  # Total number of measurements and measurement updates
-    additional_info[&quot;N_bins&quot;]    = N_bins     # Number of times bin-averaged measurements are written to file
-    additional_info[&quot;maxiter&quot;]   = maxiter    # Maximum number of conjugate gradient iterations
-    additional_info[&quot;tol&quot;]       = tol        # Tolerance used for conjugate gradient solves
-    additional_info[&quot;Nt&quot;]        = Nt         # Number of time-steps in HMC update
-    additional_info[&quot;Nrv&quot;]       = Nrv        # Number of random vectors used to estimate fermionic correlation functions
-    additional_info[&quot;seed&quot;]      = seed       # Random seed used to initialize random number generator in simulation</code></pre><p>Here we also update variables to keep track of the acceptance rates for the various types of Monte Carlo updates that will be performed during the simulation. This will be discussed in more detail in later sections of the tutorial.</p><pre><code class="language-julia hljs">    metadata[&quot;hmc_acceptance_rate&quot;] = 0.0
+    metadata[&quot;N_therm&quot;]   = N_therm    # Number of thermalization updates
+    metadata[&quot;N_updates&quot;] = N_updates  # Total number of measurements and measurement updates
+    metadata[&quot;N_bins&quot;]    = N_bins     # Number of times bin-averaged measurements are written to file
+    metadata[&quot;maxiter&quot;]   = maxiter    # Maximum number of conjugate gradient iterations
+    metadata[&quot;tol&quot;]       = tol        # Tolerance used for conjugate gradient solves
+    metadata[&quot;Nt&quot;]        = Nt         # Number of time-steps in HMC update
+    metadata[&quot;Nrv&quot;]       = Nrv        # Number of random vectors used to estimate fermionic correlation functions
+    metadata[&quot;seed&quot;]      = seed       # Random seed used to initialize random number generator in simulation</code></pre><p>Here we also update variables to keep track of the acceptance rates for the various types of Monte Carlo updates that will be performed during the simulation. This will be discussed in more detail in later sections of the tutorial.</p><pre><code class="language-julia hljs">    metadata[&quot;hmc_acceptance_rate&quot;] = 0.0
     metadata[&quot;reflection_acceptance_rate&quot;] = 0.0
-    metadata[&quot;swap_acceptance_rate&quot;] = 0.0</code></pre><p>Initialize variables to record the average number of CG iterations for each type of update and measurements.</p><pre><code class="language-julia hljs">    additional_info[&quot;hmc_iters&quot;] = 0.0
-    additional_info[&quot;reflection_iters&quot;] = 0.0
-    additional_info[&quot;swap_iters&quot;] = 0.0
-    additional_info[&quot;measurement_iters&quot;] = 0.0</code></pre><h2 id="Initialize-model"><a class="docs-heading-anchor" href="#Initialize-model">Initialize model</a><a id="Initialize-model-1"></a><a class="docs-heading-anchor-permalink" href="#Initialize-model" title="Permalink"></a></h2><p>The next step is define the model we wish to simulate. In this example the relevant model parameters the phonon energy <span>$\Omega$</span> (<code>Ω</code>), electron-phonon coupling <span>$\alpha$</span> (<code>α</code>), chemical potential <span>$\mu$</span> (<code>μ</code>), and lattice size <span>$L$</span> (<code>L</code>). The neasrest-neighbor hopping amplitude and phonon mass are normalized to unity, <span>$t = M = 1$</span>.</p><p>First we define the lattice geometry for our model, relying on the <a href="https://github.com/SmoQySuite/LatticeUtilities.jl.git">LatticeUtilities</a> package to do so. We define a the unit cell and size of our finite lattice using the <a href="https://smoqysuite.github.io/LatticeUtilities.jl/stable/api/#LatticeUtilities.UnitCell-Union%7BTuple%7BT%7D%2C%20Tuple%7BAbstractMatrix%7BT%7D%2C%20AbstractMatrix%7BT%7D%7D%7D%20where%20T%3C%3AAbstractFloat"><code>LatticeUtilities.UnitCell</code></a> and <a href="https://smoqysuite.github.io/LatticeUtilities.jl/stable/api/#LatticeUtilities.Lattice-Tuple%7BAny%2C%20Any%7D"><code>LatticeUtilities.Lattice</code></a> types, respectively. Lastly, we define various instances of the <a href="https://smoqysuite.github.io/LatticeUtilities.jl/stable/api/#LatticeUtilities.Bond-Tuple%7BAny%2C%20Any%7D"><code>LatticeUtilities.Bond</code></a> type to represent the the nearest-neighbor and next-nearest-neighbor bonds. All of this information regarding the lattice geometry is then stored in an instance of the <a href="https://smoqysuite.github.io/SmoQyDQMC.jl/stable/api/#SmoQyDQMC.ModelGeometry-Union%7BTuple%7BD%7D%2C%20Tuple%7BUnitCell%7BD%7D%2C%20Lattice%7BD%7D%7D%7D%20where%20D"><code>SmoQyDQMC.ModelGeometry</code></a> type.</p><pre><code class="language-julia hljs">    # Define the unit cell.
+    metadata[&quot;swap_acceptance_rate&quot;] = 0.0</code></pre><p>Initialize variables to record the average number of CG iterations for each type of update and measurements.</p><pre><code class="language-julia hljs">    metadata[&quot;hmc_iters&quot;] = 0.0
+    metadata[&quot;reflection_iters&quot;] = 0.0
+    metadata[&quot;swap_iters&quot;] = 0.0
+    metadata[&quot;measurement_iters&quot;] = 0.0</code></pre><h2 id="Initialize-model"><a class="docs-heading-anchor" href="#Initialize-model">Initialize model</a><a id="Initialize-model-1"></a><a class="docs-heading-anchor-permalink" href="#Initialize-model" title="Permalink"></a></h2><p>The next step is define the model we wish to simulate. In this example the relevant model parameters the phonon energy <span>$\Omega$</span> (<code>Ω</code>), electron-phonon coupling <span>$\alpha$</span> (<code>α</code>), chemical potential <span>$\mu$</span> (<code>μ</code>), and lattice size <span>$L$</span> (<code>L</code>). The neasrest-neighbor hopping amplitude and phonon mass are normalized to unity, <span>$t = M = 1$</span>.</p><p>First we define the lattice geometry for our model, relying on the <a href="https://github.com/SmoQySuite/LatticeUtilities.jl.git">LatticeUtilities</a> package to do so. We define a the unit cell and size of our finite lattice using the <a href="https://smoqysuite.github.io/LatticeUtilities.jl/stable/api/#LatticeUtilities.UnitCell-Union%7BTuple%7BT%7D%2C%20Tuple%7BAbstractMatrix%7BT%7D%2C%20AbstractMatrix%7BT%7D%7D%7D%20where%20T%3C%3AAbstractFloat"><code>LatticeUtilities.UnitCell</code></a> and <a href="https://smoqysuite.github.io/LatticeUtilities.jl/stable/api/#LatticeUtilities.Lattice-Tuple%7BAny%2C%20Any%7D"><code>LatticeUtilities.Lattice</code></a> types, respectively. Lastly, we define various instances of the <a href="https://smoqysuite.github.io/LatticeUtilities.jl/stable/api/#LatticeUtilities.Bond-Tuple%7BAny%2C%20Any%7D"><code>LatticeUtilities.Bond</code></a> type to represent the the nearest-neighbor and next-nearest-neighbor bonds. All of this information regarding the lattice geometry is then stored in an instance of the <a href="https://smoqysuite.github.io/SmoQyDQMC.jl/stable/api/#SmoQyDQMC.ModelGeometry-Union%7BTuple%7BD%7D%2C%20Tuple%7BUnitCell%7BD%7D%2C%20Lattice%7BD%7D%7D%7D%20where%20D"><code>SmoQyDQMC.ModelGeometry</code></a> type.</p><pre><code class="language-julia hljs">    # Define the unit cell.
     unit_cell = lu.UnitCell(
         lattice_vecs = [[3/2,√3/2],
                         [3/2,-√3/2]],
@@ -289,10 +289,10 @@ function run_simulation(;
         )
 
         # Record whether the reflection update was accepted or rejected.
-        additional_info[&quot;reflection_acceptance_rate&quot;] += accepted
+        metadata[&quot;reflection_acceptance_rate&quot;] += accepted
 
         # Record the number of CG iterations performed for the reflection update.
-        additional_info[&quot;reflection_iters&quot;] += iters
+        metadata[&quot;reflection_iters&quot;] += iters
 
         # Perform a swap update.
         (accepted, iters) = swap_update!(
@@ -304,10 +304,10 @@ function run_simulation(;
         )
 
         # Record whether the reflection update was accepted or rejected.
-        additional_info[&quot;swap_acceptance_rate&quot;] += accepted
+        metadata[&quot;swap_acceptance_rate&quot;] += accepted
 
         # Record the number of CG iterations performed for the reflection update.
-        additional_info[&quot;swap_iters&quot;] += iters
+        metadata[&quot;swap_iters&quot;] += iters
 
         # Perform an HMC update.
         (accepted, iters) = hmc_update!(
@@ -321,10 +321,10 @@ function run_simulation(;
         )
 
         # Record the average number of iterations per CG solve for hmc update.
-        additional_info[&quot;hmc_acceptance_rate&quot;] += accepted
+        metadata[&quot;hmc_acceptance_rate&quot;] += accepted
 
         # Record the number of CG iterations performed for the reflection update.
-        additional_info[&quot;hmc_iters&quot;] += iters
+        metadata[&quot;hmc_iters&quot;] += iters
     end</code></pre><h2 id="Make-measurements"><a class="docs-heading-anchor" href="#Make-measurements">Make measurements</a><a id="Make-measurements-1"></a><a class="docs-heading-anchor-permalink" href="#Make-measurements" title="Permalink"></a></h2><p>In this next section of code we continue to sample the phonon fields as above, but will also begin making measurements as well. For more discussion on the overall structure of this part of the code, refer to here.</p><pre><code class="language-julia hljs">    # Calculate the bin size.
     bin_size = N_updates ÷ N_bins
 
@@ -341,10 +341,10 @@ function run_simulation(;
         )
 
         # Record whether the reflection update was accepted or rejected.
-        additional_info[&quot;reflection_acceptance_rate&quot;] += accepted
+        metadata[&quot;reflection_acceptance_rate&quot;] += accepted
 
         # Record the number of CG iterations performed for the reflection update.
-        additional_info[&quot;reflection_iters&quot;] += iters
+        metadata[&quot;reflection_iters&quot;] += iters
 
         # Perform a swap update.
         (accepted, iters) = swap_update!(
@@ -356,10 +356,10 @@ function run_simulation(;
         )
 
         # Record whether the reflection update was accepted or rejected.
-        additional_info[&quot;swap_acceptance_rate&quot;] += accepted
+        metadata[&quot;swap_acceptance_rate&quot;] += accepted
 
         # Record the number of CG iterations performed for the reflection update.
-        additional_info[&quot;swap_iters&quot;] += iters
+        metadata[&quot;swap_iters&quot;] += iters
 
         # Perform an HMC update.
         (accepted, iters) = hmc_update!(
@@ -373,10 +373,10 @@ function run_simulation(;
         )
 
         # Record whether the reflection update was accepted or rejected.
-        additional_info[&quot;hmc_acceptance_rate&quot;] += accepted
+        metadata[&quot;hmc_acceptance_rate&quot;] += accepted
 
         # Record the average number of iterations per CG solve for hmc update.
-        additional_info[&quot;hmc_iters&quot;] += iters
+        metadata[&quot;hmc_iters&quot;] += iters
 
         # Make measurements.
         iters = make_measurements!(
@@ -391,7 +391,7 @@ function run_simulation(;
         )
 
         # Record the average number of iterations per CG solve for measurements.
-        additional_info[&quot;measurement_iters&quot;] += iters
+        metadata[&quot;measurement_iters&quot;] += iters
 
         # Check if bin averaged measurements need to be written to file.
         if update % bin_size == 0
@@ -406,19 +406,19 @@ function run_simulation(;
                 Δτ = Δτ
             )
         end
-    end</code></pre><h2 id="Record-simulation-metadata"><a class="docs-heading-anchor" href="#Record-simulation-metadata">Record simulation metadata</a><a id="Record-simulation-metadata-1"></a><a class="docs-heading-anchor-permalink" href="#Record-simulation-metadata" title="Permalink"></a></h2><p>At this point we are done sampling and taking measurements. Next, we want to calculate the final acceptance rate for the various types of udpates we performed, as well as write the simulation metadata to file, including the contents of the <code>additional_info</code> dictionary.</p><pre><code class="language-julia hljs">    # Calculate acceptance rates.
-    additional_info[&quot;hmc_acceptance_rate&quot;] /= (N_updates + N_therm)
-    additional_info[&quot;reflection_acceptance_rate&quot;] /= (N_updates + N_therm)
-    additional_info[&quot;swap_acceptance_rate&quot;] /= (N_updates + N_therm)
+    end</code></pre><h2 id="Record-simulation-metadata"><a class="docs-heading-anchor" href="#Record-simulation-metadata">Record simulation metadata</a><a id="Record-simulation-metadata-1"></a><a class="docs-heading-anchor-permalink" href="#Record-simulation-metadata" title="Permalink"></a></h2><p>At this point we are done sampling and taking measurements. Next, we want to calculate the final acceptance rate for the various types of udpates we performed, as well as write the simulation metadata to file, including the contents of the <code>metadata</code> dictionary.</p><pre><code class="language-julia hljs">    # Calculate acceptance rates.
+    metadata[&quot;hmc_acceptance_rate&quot;] /= (N_updates + N_therm)
+    metadata[&quot;reflection_acceptance_rate&quot;] /= (N_updates + N_therm)
+    metadata[&quot;swap_acceptance_rate&quot;] /= (N_updates + N_therm)
 
     # Calculate average number of CG iterations.
-    additional_info[&quot;hmc_iters&quot;] /= (N_updates + N_therm)
-    additional_info[&quot;reflection_iters&quot;] /= (N_updates + N_therm)
-    additional_info[&quot;swap_iters&quot;] /= (N_updates + N_therm)
-    additional_info[&quot;measurement_iters&quot;] /= N_updates
+    metadata[&quot;hmc_iters&quot;] /= (N_updates + N_therm)
+    metadata[&quot;reflection_iters&quot;] /= (N_updates + N_therm)
+    metadata[&quot;swap_iters&quot;] /= (N_updates + N_therm)
+    metadata[&quot;measurement_iters&quot;] /= N_updates
 
     # Write simulation metadata to simulation_info.toml file.
-    save_simulation_info(simulation_info, additional_info)</code></pre><h2 id="Process-results"><a class="docs-heading-anchor" href="#Process-results">Process results</a><a id="Process-results-1"></a><a class="docs-heading-anchor-permalink" href="#Process-results" title="Permalink"></a></h2><p>In this final section of code we process the binned data, calculating final estimates for the mean and error of all measured observables. The final statistics are written to CSV files using the function <code>process_measurements</code> function. For more information refer to here.</p><pre><code class="language-julia hljs">    # Process the simulation results, calculating final error bars for all measurements,
+    save_simulation_info(simulation_info, metadata)</code></pre><h2 id="Process-results"><a class="docs-heading-anchor" href="#Process-results">Process results</a><a id="Process-results-1"></a><a class="docs-heading-anchor-permalink" href="#Process-results" title="Permalink"></a></h2><p>In this final section of code we process the binned data, calculating final estimates for the mean and error of all measured observables. The final statistics are written to CSV files using the function <code>process_measurements</code> function. For more information refer to here.</p><pre><code class="language-julia hljs">    # Process the simulation results, calculating final error bars for all measurements,
     # writing final statisitics to CSV files.
     process_measurements(simulation_info.datafolder, N_bins, time_displaced = false)
 
@@ -441,4 +441,4 @@ if abspath(PROGRAM_FILE) == @__FILE__
         N_updates = parse(Int,     ARGS[8]),
         N_bins    = parse(Int,     ARGS[9]),
     )
-end</code></pre><p>For instance, the command</p><pre><code class="nohighlight hljs">&gt; julia holstein_honeycomb.jl 1 1.0 1.5 0.0 3 4.0 5000 10000 100</code></pre><p>runs a DQMC simulation of a Holstein model on a <span>$3 \times 3$</span> unit cell (<code>N = 2 \times 3^2 = 18</code> site) honeycomb lattice at half-filling <span>$(\mu = 0)$</span> and inverse temperature <span>$\beta = 4.0$</span>. The phonon energy is set to <span>$\Omega = 1.0$</span> and the electron-phonon coupling is set to <span>$\alpha = 1.5.$</span> In the DQMC simulation, 5,000 EFA-HMC, reflection and swap updates are performed to thermalize the system. Then an additional 10,000 such udpates are performed, after each of set of which measurements are made. During the simulation, bin-averaged measurements are written to file 100 times, with each bin of data containing the average of 10,000/100 = 100 sequential measurements.</p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../../api/">« API</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.11.4 on <span class="colophon-date" title="Wednesday 4 June 2025 14:50">Wednesday 4 June 2025</span>. Using Julia version 1.11.5.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+end</code></pre><p>For instance, the command</p><pre><code class="nohighlight hljs">&gt; julia holstein_honeycomb.jl 1 1.0 1.5 0.0 3 4.0 5000 10000 100</code></pre><p>runs a DQMC simulation of a Holstein model on a <span>$3 \times 3$</span> unit cell (<code>N = 2 \times 3^2 = 18</code> site) honeycomb lattice at half-filling <span>$(\mu = 0)$</span> and inverse temperature <span>$\beta = 4.0$</span>. The phonon energy is set to <span>$\Omega = 1.0$</span> and the electron-phonon coupling is set to <span>$\alpha = 1.5.$</span> In the DQMC simulation, 5,000 EFA-HMC, reflection and swap updates are performed to thermalize the system. Then an additional 10,000 such udpates are performed, after each of set of which measurements are made. During the simulation, bin-averaged measurements are written to file 100 times, with each bin of data containing the average of 10,000/100 = 100 sequential measurements.</p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../../api/">« API</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.11.4 on <span class="colophon-date" title="Wednesday 4 June 2025 15:19">Wednesday 4 June 2025</span>. Using Julia version 1.11.5.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
