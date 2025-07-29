@@ -5,20 +5,20 @@ function update_Λ!(
 ) where {T<:Number, E<:AbstractFloat}
 
     (; Δτ, x, holstein_parameters_up) = electron_phonon_parameters
-    (; Nholstein, nholstein, α, α3, coupling_to_phonon, neighbor_table, shifted) = holstein_parameters_up
+    (; Nholstein, nholstein, α, α3, coupling_to_phonon, coupling_to_site, ph_sym_form) = holstein_parameters_up
 
     # initialize assuming no holstein couplings
     @views @. Λ[1, :] = 1.0
     @views @. Λ[2:end, :] = -1.0
 
-    # if there are shifted holstein coupling
-    if any(shifted)
+    # if there are particle-hole symmetric form holstein couplings
+    if any(ph_sym_form)
         # Number of unit cells
         Nunitcells = Nholstein ÷ nholstein
         # iterate over types of holstein coupling
         for nhol in 1:nholstein
             # if holstein coupling is shiffted
-            if shifted[nhol]
+            if ph_sym_form[nhol]
                 # iterate over unit cells
                 for uc in 1:Nunitcells
                     # get the holstein coupling
@@ -26,7 +26,7 @@ function update_Λ!(
                     # get phonon mode
                     phonon  = coupling_to_phonon[coupling]
                     # get orbital in lattice
-                    orbital = neighbor_table[2,coupling]
+                    orbital = coupling_to_site[coupling]
                     # get couplings
                     αc = α[coupling]
                     α3c = α3[coupling]
@@ -165,18 +165,18 @@ function mul_νRe∂Λ∂x!(
 ) where {T<:Number, E<:AbstractFloat}
 
     (; Lτ, Δτ, x, holstein_parameters_up) = electron_phonon_parameters
-    (; Nholstein, nholstein, α, α3, coupling_to_phonon, neighbor_table, shifted) = holstein_parameters_up
+    (; Nholstein, nholstein, α, α3, coupling_to_phonon, coupling_to_site, ph_sym_form) = holstein_parameters_up
     v′ = reshaped(u′, size(Λ))
     v  = reshaped(u, size(Λ))
 
-    # if there are shifted holstein coupling
-    if any(shifted)
+    # if there are particle-hole symmetric form holstein couplings
+    if any(ph_sym_form)
         # number of unit cells in lattice
         Nunitcells = Nholstein ÷ nholstein
         # iterate over types of holstein coupling
         for nhol in 1:nholstein
             # if holstein coupling is shiffted
-            if shifted[nhol]
+            if ph_sym_form[nhol]
                 # iterate over unit cells
                 for uc in 1:Nunitcells
                     # get the holstein coupling
@@ -187,7 +187,7 @@ function mul_νRe∂Λ∂x!(
                     # get phonon
                     phonon = coupling_to_phonon[coupling]
                     # get the site
-                    site = neighbor_table[2, phonon]
+                    site = coupling_to_site[coupling]
                     # iterate over imaginary time slices
                     for l in axes(Λ, 1)                    
                         # calculate c⋅Re[⟨v′|∂Λ/∂x|v⟩]

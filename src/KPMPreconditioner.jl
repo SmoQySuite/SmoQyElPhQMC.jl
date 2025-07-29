@@ -237,10 +237,12 @@ function KPMPreconditioner(
     tmp_lanczos = zeros(T, N, 6)
 
     # initialize checkerboard matrix
+    Nneighbors = size(checkerboard_neighbor_table, 2)
+    colors = iszero(Nneighbors) ? Matrix{Int}(undef, 2, 0) : hcat([[first(r),last(r)] for r in checkerboard_colors]...)
     Γ = CheckerboardMatrix{T}(
-        false, false, N, size(checkerboard_neighbor_table, 2), length(checkerboard_colors),
+        false, false, N, Nneighbors, length(checkerboard_colors),
         checkerboard_neighbor_table, vec(mean(coshΔτt, dims=1)), vec(mean(sinhΔτt, dims=1)),
-        checkerboard_perm, invperm(checkerboard_perm), hcat([[first(r),last(r)] for r in checkerboard_colors]...)
+        checkerboard_perm, invperm(checkerboard_perm), colors
     )
 
     if isa(fermion_det_matrix, SymFermionDetMatrix)

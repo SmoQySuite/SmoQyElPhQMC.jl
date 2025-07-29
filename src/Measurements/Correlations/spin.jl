@@ -5,11 +5,11 @@ function measure_spin_correlation!(
     a::Int, b::Int, coef::T = 1.0
 ) where {Dp1, D, E<:AbstractFloat, T<:Number}
 
-    # SzSz(τ,r) = -2⋅G(b,i,0|a,i+r,τ)⋅G(a,i+r,τ|b,i,0)
+    # SzSz(τ,r) = -2⋅G(b,i,0|a,i+r,τ)⋅G(a,i+r,τ|b,i,0)/4
     z = @SVector zeros(Int, D)
     measure_G0Δ_GΔ0!(
         SzSz, greens_estimator,
-        (b, a, a, b), z, z, z, z, -2.0*coef
+        (b, a, a, b), z, z, z, z, -0.5*coef
     )
 
     return nothing

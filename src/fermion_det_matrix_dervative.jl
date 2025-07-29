@@ -264,7 +264,7 @@ function _mul_νReΔτ∂V∂x!(
 
     (; β, Δτ, x, phonon_parameters) = elph
     holstein_parameters = elph.holstein_parameters_up
-    (; α, α2, α3, α4, coupling_to_phonon, neighbor_table, Nholstein) = holstein_parameters
+    (; α, α2, α3, α4, coupling_to_phonon, coupling_to_site, Nholstein) = holstein_parameters
     (; M) = phonon_parameters
 
     # iterate over holstein couplings
@@ -272,7 +272,7 @@ function _mul_νReΔτ∂V∂x!(
         # get the phonon associated with the coupling
         p = coupling_to_phonon[c]
         # get the orbital whose density is getting coupled to
-        i = neighbor_table[2,c]
+        i = coupling_to_site[c]
         # if phonon mass is finite
         if isfinite(M[p])
             # iterate over imaginary time slice

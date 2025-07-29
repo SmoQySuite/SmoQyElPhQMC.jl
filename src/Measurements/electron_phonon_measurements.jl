@@ -65,14 +65,14 @@ function measure_holstein_energy(
     holstein_id::Int
 ) where {D, E<:AbstractFloat}
 
-    (; nholstein, Nholstein, neighbor_table, coupling_to_phonon, shifted) = holstein_parameters
+    (; nholstein, Nholstein, coupling_to_site, coupling_to_phonon, ph_sym_form) = holstein_parameters
     (; Nrv, L, N, n, Lτ) = greens_estimator
 
     # initialize holstein electron-phonon coupling energy to zero
     ϵ_hol = zero(Complex{E})
 
-    # if using shifted defintion
-    shift = shifted[holstein_id]
+    # if using particle-hole symmetric defintion
+    phs = ph_sym_form[holstein_id]
 
     # get phonon fields associated with coupling ID
     phonon_i = coupling_to_phonon[(holstein_id-1) * N + 1]
@@ -82,7 +82,8 @@ function measure_holstein_energy(
 
     # determine the orbital species of the orbital density that the phonon
     # is coupling to for this interaction
-    site = neighbor_table[2, (holstein_id-1)*N+1]
+    coupling = (holstein_id-1)*N+1
+    site = coupling_to_site[coupling]
     orbital_id = mod1(site, n)
 
     # get views based on orbital ID
@@ -106,12 +107,12 @@ function measure_holstein_energy(
         # iterate over imaginary-time slices
         for l in 1:Lτ
             # estimate the density using all random vectors
-            n_li = sum(1.0 - GR[l, i, n] * Rt[l, i, n] for n in 1:Nrv) / Nrv
+            n_li = sum(1.0 - GR[l, i, rv] * Rt[l, i, rv] for rv in 1:Nrv) / Nrv
             # get phonon field
             x_il = x″[i, l]
             # calculate holstein interaction energy
             ϵ_hol += (α2[i]*x_il^2 + α4[i]*x_il^4) * n_li
-            ϵ_hol += shift ? (α1[i]*x_il^1 + α3[i]*x_il^2) * (n_li - 0.5) : (α1[i]*x_il^1 + α3[i]*x_il^2) * n_li
+            ϵ_hol += phs ? (α1[i]*x_il^1 + α3[i]*x_il^2) * (n_li - 0.5) : (α1[i]*x_il^1 + α3[i]*x_il^2) * n_li
         end
     end
 
@@ -129,23 +130,18 @@ function measure_ssh_energy(
     ssh_id::Int
 ) where {D, T<:Number, E<:AbstractFloat}
 
-    (; nssh, Nssh) = ssh_parameters
+    (; nssh, coupling_to_phonon) = ssh_parameters
     (; Nrv, L, N, n, Lτ) = greens_estimator
 
     # initialize ssh energy to zero
     ϵ_ssh = zero(Complex{E})
 
-    # get phonon fields associated with coupling ID
-    phonon_i = coupling_to_phonon[(ssh_id-1) * N + 1]
-    phonon_f = coupling_to_phonon[ssh_id * N]
-    x′ = @view x[phonon_i:phonon_f, :]
-    x″ = reshape(x′, (N, Lτ))
-
     # get the relevant view into neighbor table and phonon mapping
-    slice = (holstein_id-1)*N+1:holstein_id*N
+    ssh_index_i = (ssh_id-1) * N + 1
+    ssh_index_f = ssh_id * N
+    slice = ssh_index_i:ssh_index_f
     neighbor_table = @view ssh_parameters.neighbor_table[1, slice]
     coupling_to_phonon = @view ssh_parameters.coupling_to_phonon[slice]
-
 
     # get views based on orbital ID
     GR = reshape(greens_estimator.Rt, Lτ, N, Nrv)
@@ -176,11 +172,11 @@ function measure_ssh_energy(
             # calculate coupling
             c_ul = α1[u] * Δx + α2[u] * Δx^2 + α3[u] * Δx^3 + α4[u] * Δx^4
             # get forward hopping amplitude
-            hf = sum(GR[l, s_f, rv] * Rt[l, s_i, rv] for rv in 1:Nrv)/Nrv
+            hf = -sum(GR[l, s_i, rv] * Rt[l, s_f, rv] for rv in 1:Nrv)/Nrv
             # get reverse hopping process
-            hr = sum(GR[l, s_i, rv] * Rt[l, s_f, rv] for rv in 1:Nrv)/Nrv
+            hr = -sum(GR[l, s_f, rv] * Rt[l, s_i, rv] for rv in 1:Nrv)/Nrv
             # calculate interaction energy
-            ϵ_ssh += c_ul * hf + (conj) * hr
+            ϵ_ssh += c_ul * hf + conj(c_ul) * hr
         end
     end
 
