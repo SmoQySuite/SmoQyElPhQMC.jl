@@ -40,6 +40,7 @@ function radial_update!(
     ssh_parameters = electron_phonon_parameters.ssh_parameters_up
     x = electron_phonon_parameters.x
     M = phonon_parameters.M
+    Lτ = fermion_path_integral.Lτ
 
     # get the mass associated with each phonon
     M = phonon_parameters.M
@@ -72,7 +73,7 @@ function radial_update!(
 
     # number of fields to update, excluding phonon fields that correspond
     # to phonon modes with infinite mass
-    d = count(m -> isfinite(m), M′)
+    d = count(m -> isfinite(m), M′) * Lτ
 
     # calculate standard deviation for normal distribution
     σR = σ / sqrt(d)
