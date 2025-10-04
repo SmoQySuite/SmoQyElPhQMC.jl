@@ -220,13 +220,15 @@ function update!(
     Δτ′ = isa(fermion_det_matrix, AsymFermionDetMatrix) ? Δτ : Δτ/2
 
     # iterate over hopping
-    @simd for h in axes(t, 1)
+    @inbounds for h in axes(t, 1)
+        h′ = checkerboard_perm[h]
+        t_h′ = @view t[h′, :]
         # iterate over imaginary-time slice
-        for l in axes(t, 2)
-            h′ = checkerboard_perm[h]
-            t′ = t[h′, l]
-            coshΔτt[l,h] = cosh(Δτ′ * abs(t′))
-            sinhΔτt[l,h] = sign(conj(t′)) * sinh(Δτ′ * abs(t′))
+        @simd for l in axes(t, 2)
+            t′ = t_h′[l]
+            Δτt_abs = Δτ′ * abs(t′)
+            coshΔτt[l,h] = cosh(Δτt_abs)
+            sinhΔτt[l,h] = sign(conj(t′)) * sinh(Δτt_abs)
         end
     end
 

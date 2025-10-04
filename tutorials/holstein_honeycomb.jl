@@ -65,7 +65,7 @@ function run_simulation(;
     Nt = 10, # Numer of time-steps in HMC update.
     Nrv = 10, # Number of random vectors used to estimate fermionic correlation functions.
     tol = 1e-10, # CG iterations tolerance.
-    maxiter = 1000, # Maximum number of CG iterations.
+    maxiter = 10_000, # Maximum number of CG iterations.
     write_bins_concurrent = true, # Whether to write HDF5 bins during the simulation.
     seed = abs(rand(Int)), # Seed for random number generator.
     filepath = "." # Filepath to where data folder will be created.
@@ -105,24 +105,24 @@ function run_simulation(;
     metadata = Dict()
 
     ## Record simulation parameters.
-    metadata["N_therm"]   = N_therm    # Number of thermalization updates
+    metadata["N_therm"] = N_therm  # Number of thermalization updates
     metadata["N_updates"] = N_updates  # Total number of measurements and measurement updates
-    metadata["N_bins"]    = N_bins     # Number of times bin-averaged measurements are written to file
-    metadata["maxiter"]   = maxiter    # Maximum number of conjugate gradient iterations
-    metadata["tol"]       = tol        # Tolerance used for conjugate gradient solves
-    metadata["Nt"]        = Nt         # Number of time-steps in HMC update
-    metadata["Nrv"]       = Nrv        # Number of random vectors used to estimate fermionic correlation functions
-    metadata["seed"]      = seed       # Random seed used to initialize random number generator in simulation
+    metadata["N_bins"] = N_bins # Number of times bin-averaged measurements are written to file
+    metadata["maxiter"] = maxiter # Maximum number of conjugate gradient iterations
+    metadata["tol"] = tol # Tolerance used for conjugate gradient solves
+    metadata["Nt"] = Nt # Number of time-steps in HMC update
+    metadata["Nrv"] = Nrv # Number of random vectors used to estimate fermionic correlation functions
+    metadata["seed"] = seed  # Random seed used to initialize random number generator in simulation
 # Here we also update variables to keep track of the acceptance rates for the various types of Monte Carlo updates
 # that will be performed during the simulation. This will be discussed in more detail in later sections of the tutorial.
-    metadata["hmc_acceptance_rate"] = 0.0
-    metadata["reflection_acceptance_rate"] = 0.0
-    metadata["swap_acceptance_rate"] = 0.0
+    metadata["hmc_acceptance_rate"] = 0.0 # HMC acceptance rate
+    metadata["reflection_acceptance_rate"] = 0.0 # Reflection update acceptance rate
+    metadata["swap_acceptance_rate"] = 0.0 # Swap update acceptance rate
 # Initialize variables to record the average number of CG iterations for each type of update and measurements.
-    metadata["hmc_iters"] = 0.0
-    metadata["reflection_iters"] = 0.0
-    metadata["swap_iters"] = 0.0
-    metadata["measurement_iters"] = 0.0
+    metadata["hmc_iters"] = 0.0 # Avg number of CG iteractions per solve in HMC update.
+    metadata["reflection_iters"] = 0.0 # Avg number of CG iterations per solve in reflection update.
+    metadata["swap_iters"] = 0.0 # Avg number of CG iterations per solve in swap update.
+    metadata["measurement_iters"] = 0.0 # Avg number of CG iterations per solve while making measurements.
 
 # ## Initialize model
 # The next step is define the model we wish to simulate.
@@ -499,8 +499,7 @@ function run_simulation(;
 # We use the [`KPMPreconditioner`](@ref) type to accelerate the convergence of the CG calculations, thereby accelerating the simulations.
 
     ## Initialize KPM preconditioner.
-    # preconditioner = KPMPreconditioner(fermion_det_matrix, rng = rng)
-    preconditioner = I
+    preconditioner = KPMPreconditioner(fermion_det_matrix, rng = rng)
 
 # Finally, we initialize an instance of the [`GreensEstimator`](@ref) type, which is for
 # estimating fermionic correlation functions when making measurements.

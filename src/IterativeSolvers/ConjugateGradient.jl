@@ -177,7 +177,7 @@ function cg_solve!(
     tol::E = cg_solver.tol
 ) where {T<:Number, E<:AbstractFloat}
     
-    (; maxiter, tol, r, p, z) = cg_solver
+    (; r, p, z) = cg_solver
     x = reshaped(x, length(x))
     b = reshaped(b, length(b))
     

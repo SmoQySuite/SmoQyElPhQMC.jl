@@ -163,8 +163,7 @@ function hmc_update!(
 
         # calculate derivative of fermionic action for spin-up electrons
         Sf, iters, ϵ = calculate_derivative_fermionic_action!(
-            ∂S∂x, pff_calculator, electron_phonon_parameters, fermion_det_matrix, preconditioner, rng,
-            tol_force, maxiter
+            ∂S∂x, pff_calculator, electron_phonon_parameters, fermion_det_matrix, preconditioner, rng, tol_force, maxiter
         )
         iters_avg += iters / (Nt+1)
 
