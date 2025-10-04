@@ -134,7 +134,7 @@ function cg_solve!(
         return 0, ϵ
     end
     
-    @fastmath @inbounds for iter in 1:maxiter
+    @inbounds for iter in 1:maxiter
         
         # αⱼ = (rⱼ⋅rⱼ)/(pⱼ⋅A⋅pⱼ)
         mul!(z,A,p)
@@ -213,7 +213,7 @@ function cg_solve!(
         return 0, ϵ
     end
     
-    @fastmath @inbounds for iter in 1:maxiter
+    @inbounds for iter in 1:maxiter
         
         # αⱼ = (rⱼ⋅zⱼ)/(pⱼ⋅A⋅pⱼ)
         mul!(z,A,p)

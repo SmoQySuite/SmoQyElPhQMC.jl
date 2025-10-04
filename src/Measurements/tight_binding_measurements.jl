@@ -185,14 +185,14 @@ function measure_hopping_energy(
     Rt = reshape(greens_estimator.Rt, (Lτ, Nsites, Nrv))
 
     # iterate over random vector
-    for rv in 1:Nrv
+    @inbounds for rv in 1:Nrv
         # iterate over hoppings
         for m in 1:N
             # get the pair of sites connected by the hopping
             i = neighbor_table[1,m] # initial site
             f = neighbor_table[2,m] # final site
             # iterate over imaginary-time slice
-            for l in 1:Lτ
+            @simd for l in 1:Lτ
                 # get the hopping amplitude
                 t_if = t[m,l]
                 # calculate hopping energy of current unit cell

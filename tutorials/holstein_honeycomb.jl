@@ -36,7 +36,6 @@
 # formatting, respectively.
 
 using SmoQyElPhQMC
-
 using SmoQyDQMC
 import SmoQyDQMC.LatticeUtilities as lu
 
@@ -66,6 +65,7 @@ function run_simulation(;
     Nrv = 10, # Number of random vectors used to estimate fermionic correlation functions.
     tol = 1e-10, # CG iterations tolerance.
     maxiter = 1000, # Maximum number of CG iterations.
+    write_bins_concurrent = true, # Whether to write HDF5 bins during the simulation.
     seed = abs(rand(Int)), # Seed for random number generator.
     filepath = "." # Filepath to where data folder will be created.
 )
@@ -85,6 +85,7 @@ function run_simulation(;
     simulation_info = SimulationInfo(
         filepath = filepath,                     
         datafolder_prefix = datafolder_prefix,
+        write_bins_concurrent = write_bins_concurrent,
         sID = sID
     )
 
@@ -136,12 +137,18 @@ function run_simulation(;
 # the nearest-neighbor and next-nearest-neighbor bonds.
 # All of this information regarding the lattice geometry is then stored in an instance of the [`SmoQyDQMC.ModelGeometry`](@extref) type.
 
+    ## Define lattice vectors.
+    a1 = [+3/2, +√3/2]
+    a2 = [+3/2, -√3/2]
+
+    ## Define basis vectors for two orbitals in the honeycomb unit cell.
+    r1 = [0.0, 0.0] # Location of first orbital in unit cell.
+    r2 = [1.0, 0.0] # Location of second orbital in unit cell.
+
     ## Define the unit cell.
     unit_cell = lu.UnitCell(
-        lattice_vecs = [[3/2,√3/2],
-                        [3/2,-√3/2]],
-        basis_vecs   = [[0.,0.],
-                        [1.,0.]]
+        lattice_vecs = [a1, a2],
+        basis_vecs   = [r1, r2]
     )
 
     ## Define finite lattice with periodic boundary conditions.
@@ -198,7 +205,10 @@ function run_simulation(;
 # using the [`SmoQyDQMC.PhononMode`](@extref) type and [`SmoQyDQMC.add_phonon_mode!`](@extref) function.
 
     ## Define a dispersionless electron-phonon mode to live on each site in the lattice.
-    phonon_1 = PhononMode(orbital = 1, Ω_mean = Ω)
+    phonon_1 = PhononMode(
+        basis_vec = r1,
+        Ω_mean = Ω
+    )
 
     ## Add the phonon mode definition to the electron-phonon model.
     phonon_1_id = add_phonon_mode!(
@@ -206,8 +216,11 @@ function run_simulation(;
         phonon_mode = phonon_1
     )
 
-    ## Define a dispersionless electron-phonon mode to live on each site in the lattice.
-    phonon_2 = PhononMode(orbital = 2, Ω_mean = Ω)
+    ## Define a dispersionless electron-phonon mode to live on the second sublattice.
+    phonon_2 = PhononMode(
+        basis_vec = r2,
+        Ω_mean = Ω
+    )
 
     ## Add the phonon mode definition to the electron-phonon model.
     phonon_2_id = add_phonon_mode!(
@@ -221,10 +234,11 @@ function run_simulation(;
     ## Define first local Holstein coupling for first phonon mode.
     holstein_coupling_1 = HolsteinCoupling(
         model_geometry = model_geometry,
-        phonon_mode = phonon_1_id,
-        ## Couple the first phonon mode to first orbital in the unit cell.
-        bond = lu.Bond(orbitals = (1,1), displacement = [0, 0]),
-        α_mean = α
+        phonon_id = phonon_1_id,
+        orbital_id = 1,
+        displacement = [0, 0],
+        α_mean = α,
+        ph_sym_form = true,
     )
 
     ## Add the first local Holstein coupling definition to the model.
@@ -237,10 +251,11 @@ function run_simulation(;
     ## Define first local Holstein coupling for first phonon mode.
     holstein_coupling_2 = HolsteinCoupling(
         model_geometry = model_geometry,
-        phonon_mode = phonon_2_id,
-        ## Couple the second phonon mode to second orbital in the unit cell.
-        bond = lu.Bond(orbitals = (2,2), displacement = [0, 0]),
-        α_mean = α
+        phonon_id = phonon_2_id,
+        orbital_id = 2,
+        displacement = [0, 0],
+        α_mean = α,
+        ph_sym_form = true,
     )
 
     ## Add the first local Holstein coupling definition to the model.
@@ -365,7 +380,23 @@ function run_simulation(;
     )
 
 # It is also useful to initialize more specialized composite correlation function measurements.
-# Specifically, to detect the formation of charge-density wave order where the electrons preferentially
+
+# First, it can be useful to measure the time-displaced single-particle electron Green's function traced over both orbitals in the unit cell.
+# We can easily implement this measurement using the [`initialize_composite_correlation_measurement!`](@ref) function, as shown below.
+
+    ## Initialize measurement of electron Green's function traced
+    ## over both orbitals in the unit cell.
+    initialize_composite_correlation_measurement!(
+        measurement_container = measurement_container,
+        model_geometry = model_geometry,
+        name = "tr_greens",
+        correlation = "greens",
+        id_pairs = [(1,1), (2,2)],
+        coefficients = [1.0, 1.0],
+        time_displaced = true,
+    )
+
+# Additionally, to detect the formation of charge-density wave order where the electrons preferentially
 # localize on one of the two sub-lattices of the honeycomb lattice, it is useful to measure the correlation function
 # ```math
 # C_\text{cdw}(\mathbf{r},\tau) = \frac{1}{L^2}\sum_{\mathbf{i}} \langle \hat{\Phi}^{\dagger}_{\mathbf{i}+\mathbf{r}}(\tau) \hat{\Phi}^{\phantom\dagger}_{\mathbf{i}}(0) \rangle,
@@ -377,7 +408,7 @@ function run_simulation(;
 # and ``\hat{n}_{\mathbf{i},\gamma} = (\hat{n}_{\uparrow,\mathbf{i},o} + \hat{n}_{\downarrow,\mathbf{i},o})`` is the total electron number
 # operator for orbital ``\gamma \in \{A,B\}`` in unit cell ``\mathbf{i}``.
 # It is then also useful to calculate the corresponding structure factor ``S_\text{cdw}(\mathbf{q},\tau)`` and susceptibility ``\chi_\text{cdw}(\mathbf{q}).``
-# This can all be easily calculated using the [`SmoQyDQMC.initialize_composite_correlation_measurement!`](@extref) function, as shown below.
+# Again, this can all be easily calculated using the [`initialize_composite_correlation_measurement!`](@ref) function, as shown below.
 
     ## Initialize CDW correlation measurement.
     initialize_composite_correlation_measurement!(
@@ -387,16 +418,10 @@ function run_simulation(;
         correlation = "density",
         ids = [1, 2],
         coefficients = [1.0, -1.0],
+        displacement_vecs = [[0.0, 0.0], [0.0, 0.0]],
         time_displaced = false,
         integrated = true
     )
-
-# The [`SmoQyDQMC.initialize_measurement_directories`](@extref) can now be used used to initialize the various subdirectories
-# in the data folder that the measurements will be written to.
-# Again, for more information refer to the Simulation Output Overview page.
-
-    ## Initialize the sub-directories to which the various measurements will be written.
-    initialize_measurement_directories(simulation_info, measurement_container)
 
 # ## Setup QMC Simulation
 # This section of the code sets up the QMC simulation by allocating the initializing the relevant types and arrays we will need in the simulation.
@@ -438,13 +463,13 @@ function run_simulation(;
 # call modifies the
 # [`SmoQyDQMC.FermionPathIntegral`](@extref) to reflect the contribution from the initial phonon field configuration.
 
-# Next we initialize an instance of the [`AsymFermionDetMatrix`](@ref) type of represent the Fermion determinant matrix,
+# Next we initialize an instance of the [`SymFermionDetMatrix`](@ref) type of represent the Fermion determinant matrix,
 # where is an inherited type from the abstracy [`FermionDetMatrix`](@ref) type.
-# We could have used an instance of the [`SymFermionDetMatrix`](@ref) here instead if we wanted to.
+# We could have used an instance of the [`AsymFermionDetMatrix`](@ref) here instead if we wanted to.
 
     ## Initialize fermion determinant matrix. Also set the default tolerance and max iteration count
     ## used in conjugate gradient (CG) solves of linear systems involving this matrix.
-    fermion_det_matrix = AsymFermionDetMatrix(
+    fermion_det_matrix = SymFermionDetMatrix(
         fermion_path_integral,
         maxiter = maxiter, tol = tol
     )
@@ -650,20 +675,25 @@ function run_simulation(;
         ## Record the average number of iterations per CG solve for measurements.
         metadata["measurement_iters"] += iters
 
-        ## Check if bin averaged measurements need to be written to file.
-        if update % bin_size == 0
-
-            ## Write the bin-averaged measurements to file.
-            write_measurements!(
-                measurement_container = measurement_container,
-                simulation_info = simulation_info,
-                model_geometry = model_geometry,
-                bin = update ÷ bin_size,
-                bin_size = bin_size,
-                Δτ = Δτ
-            )
-        end
+        ## Write the bin-averaged measurements to file if update ÷ bin_size == 0.
+        write_measurements!(
+            measurement_container = measurement_container,
+            simulation_info = simulation_info,
+            model_geometry = model_geometry,
+            update = update,
+            bin_size = bin_size,
+            Δτ = Δτ
+        )
     end
+
+# ## Merge binned data
+# At this point the simulation is essentially complete, with all updates and measurements having been performed.
+# However, the binned measurement data resides in many seperate HDF5 files currently.
+# Here we will merge these seperate HDF5 files into a single file containing all the binned data
+# using the [`merge_bins`](@extref) function.
+
+    ## Merge binned data into a single HDF5 file.
+    merge_bins(simulation_info)
 
 # ## Record simulation metadata
 # At this point we are done sampling and taking measurements.
@@ -685,17 +715,73 @@ function run_simulation(;
     ## Write simulation metadata to simulation_info.toml file.
     save_simulation_info(simulation_info, metadata)
 
-# ## Process results
-# In this final section of code we process the binned data, calculating final estimates for the mean and error of all measured observables.
-# The final statistics are written to CSV files using the function `process_measurements` function.
-# For more information refer to here.
+# ## Post-process results
+# In this final section of code we post-process the binned data.
+# This includes calculating the final estimates for the mean and error of all measured observables,
+# which will be written to an HDF5 file using the [`process_measurements`](@ref) function.
+# Inside this function the binned data gets further rebinned into `n_bins`,
+# where `n_bins` is any positive integer satisfying the constraints `(N_bins ≥ n_bin)` and `(N_bins % n_bins == 0)`.
+# Note that the [`process_measurements`](@ref) function has many additional keyword arguments that can be used to control the output.
+# For instance, in this example in addition to writing the statistics to an HDF5 file, we also export the statistics to CSV files
+# by setting `export_to_csv = true`, with additional keyword arguments controlling the formatting of the CSV files.
+# Again, for more information on how to interpret the output refer the [Simulation Output Overview](@ref) page.
 
-    ## Process the simulation results, calculating final error bars for all measurements,
+    ## Process the simulation results, calculating final error bars for all measurements.
     ## writing final statisitics to CSV files.
-    process_measurements(simulation_info.datafolder, N_bins, time_displaced = false)
+    process_measurements(
+        datafolder = simulation_info.datafolder,
+        n_bins = N_bins,
+        export_to_csv = true,
+        scientific_notation = false,
+        decimals = 7,
+        delimiter = " "
+    )
 
-    ## Merge binary files containing binned data into a single file.
-    compress_jld2_bins(folder = simulation_info.datafolder)
+# A common measurement that needs to be computed at the end of a DQMC simulation is something called the correlation
+# ratio with respect to the ordering wave-vector for a specified type of structure factor measured during the simulation.
+# In the case of the honeycomb Holstein model, we are interested in measureing the correlation ratio
+# ```math
+# R_\text{cdw}(0) = 1 - \frac{1}{4} \sum_{\delta\mathbf{q}} \frac{S_\text{cdw}(0 + \delta\mathbf{q})}{S_\text{cdw}(0)}
+# ```
+# with respect to the equal-time charge density wave (CDW) structure factor ``S_\text{cdw}(0)``, where ````S_\text{cdw}(q)``` is
+# equal-time structure factor corresponding to the composite correlation function ``C_\text{cdw}(\mathbf{r},\tau)`` defined earlier in this tutorial.
+# Note that the CDW ordering wave-vector is ``\mathbf{Q}_\text{cdw} = 0`` in this case, which describes the electrons preferentially
+# localizing on one of the two sub-lattices of the honeycomb lattice.
+# The sum over ``\delta\mathbf{q}`` runs over the four wave-vectors that neigbor ``\mathbf{Q}_\text{cdw} = 0.``
+
+# Here we use the [`compute_composite_correlation_ratio`](@ref) function to compute to compute this correlation ratio.
+# Note that the ``\mathbf{Q}_\text{cdw} = 0`` is specified using the `q_point` keyword argument, and the four neighboring wave-vectors
+# ``\delta\mathbf{q}`` are specified using the `q_neighbors` keyword argument.
+# These wave-vectors are specified using the convention described [here](@ref vector_reporting_conventions) in the [Simulation Output Overview](@ref) page.
+# Note that because the honeycomb lattice has a ``C_6`` rotation symmetry, each wave-vector in momentum-space has six nearest-neighbor wave-vectors.
+# Below we specify all six wave-vectors that neighbor the ``\mathbf{Q}_\text{cdw} = 0`` wave-vector ordering wave-vector, accounting for the fact
+# that the Brilliouin zone is periodic in the reciprocal lattice vectors.
+
+    ## Calculate CDW correlation ratio.
+    Rcdw, ΔRcdw = compute_composite_correlation_ratio(
+        datafolder = simulation_info.datafolder,
+        name = "cdw",
+        type = "equal-time",
+        q_point = (0, 0),
+        q_neighbors = [
+            (1,0),   (0,1),   (1,1),
+            (L-1,0), (0,L-1), (L-1,L-1)
+        ]
+    )
+
+# Next, we record the measurement in the `metadata` dictionary, and then write a new version of the simulation summary TOML file that
+# contains this new information using the [`save_simulation_info`](@ref) function.
+
+    ## Record the AFM correlation ratio mean and standard deviation.
+    metadata["Rcdw_mean_real"] = real(Rcdw)
+    metadata["Rcdw_mean_imag"] = imag(Rcdw)
+    metadata["Rcdw_std"]       = ΔRcdw
+
+    ## Write simulation summary TOML file.
+    save_simulation_info(simulation_info, metadata)
+
+# Note that as long as the binned data persists the [`process_measurements`](@ref) and [`compute_correlation_ratio`](@ref)
+# functions can be rerun to recompute the final statistics for the measurements without needing to rerun the simulation.
 
     return nothing
 end # end of run_simulation function

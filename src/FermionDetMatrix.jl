@@ -92,7 +92,7 @@ function SymFermionDetMatrix(
         checkerboard_perm = Int[]
         checkerboard_color_intervals = UnitRange{Int}[]
     else
-        checkerboard_neighbor_table = deepcopy(neighbor_table)
+        checkerboard_neighbor_table = copy(neighbor_table)
         checkerboard_perm, checkerboard_colors = checkerboard_decomposition!(checkerboard_neighbor_table)
         checkerboard_color_intervals = [checkerboard_colors[1,i]:checkerboard_colors[2,i] for i in axes(checkerboard_colors,2)]
     end
@@ -411,7 +411,7 @@ function mul_M!(
     )
 
     # iterate over orbitals
-    for i in axes(u′, 2)
+    @inbounds for i in axes(u′, 2)
         # v′[1] = v[1] + B[1]⋅v[Lτ]
         u′[1,i] = u[1,i] + u′[1,i]
         # iterate over imaginary-time slice
@@ -450,7 +450,7 @@ function mul_M!(
     @. u′ = expnΔτV * u′
 
     # iterate over orbitals
-    for i in axes(u′, 2)
+    @inbounds for i in axes(u′, 2)
         # v′[1] = v[1] + B[1]⋅v[Lτ]
         u′[1,i] = u[1,i] + u′[1,i]
         # iterate over imaginary-time slice
@@ -507,18 +507,14 @@ function mul_Mt!(
     )
 
     # iterate over orbitals
-    for i in axes(u, 2)
-
+    @inbounds for i in axes(u, 2)
         # record v′[Lτ] = v[Lτ] + Bᵀ[1]⋅v[1] for l = Lτ
         vp_Lτ_i = u[Lτ,i] + u′[1,i]
-
         # iterate over imaginary-time slices
         @simd for l in 1:Lτ-1
-
             # v′[l] = v[l] - Bᵀ[l+1]⋅v[l+1] for l < Lτ
             u′[l,i] = u[l,i] - u′[l+1,i]
         end
-
         # apply v′[Lτ] = v[Lτ] + Bᵀ[1]⋅v[1] for l = Lτ
         u′[Lτ,i] = vp_Lτ_i
     end
@@ -549,18 +545,14 @@ function mul_Mt!(
     )
 
     # iterate over orbitals
-    for i in axes(u, 2)
-
+    @inbounds for i in axes(u, 2)
         # record v′[Lτ] = v[Lτ] + Bᵀ[1]⋅v[1] for l = Lτ
         vp_Lτ_i = u[Lτ,i] + u′[1,i]
-
         # iterate over imaginary-time slices
         @simd for l in 1:Lτ-1
-
             # v′[l] = v[l] - Bᵀ[l+1]⋅v[l+1] for l < Lτ
             u′[l,i] = u[l,i] - u′[l+1,i]
         end
-
         # apply v′[Lτ] = v[Lτ] + Bᵀ[1]⋅v[1] for l = Lτ
         u′[Lτ,i] = vp_Lτ_i
     end

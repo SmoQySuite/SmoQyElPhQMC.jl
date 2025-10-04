@@ -700,6 +700,15 @@ function add_contraction_to_correlation!(
     # add contraction to correlation
     @. correlation += coef * permuted_contraction
 
+    # L = size(correlation)
+    # inds1 = CartesianIndices(L)
+    # inds2 = CartesianIndices((L[Dp1], L[1:Dp1-1]...))
+    # @inbounds @simd for (i, I) in enumerate(inds1)
+    #     # permute dims manually: last index ↔ first
+    #     J = inds2[i]
+    #     correlation[I] += coef * contraction[J]
+    # end
+
     return nothing
 end
 
