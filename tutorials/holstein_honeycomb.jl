@@ -39,6 +39,7 @@ using SmoQyElPhQMC
 using SmoQyDQMC
 import SmoQyDQMC.LatticeUtilities as lu
 
+using LinearAlgebra
 using Random
 using Printf
 
@@ -61,7 +62,7 @@ function run_simulation(;
     N_updates, # Total number of measurements and measurement updates.
     N_bins, # Number of times bin-averaged measurements are written to file.
     Δτ = 0.05, # Discretization in imaginary time.
-    Nt = 100, # Numer of time-steps in HMC update.
+    Nt = 10, # Numer of time-steps in HMC update.
     Nrv = 10, # Number of random vectors used to estimate fermionic correlation functions.
     tol = 1e-10, # CG iterations tolerance.
     maxiter = 1000, # Maximum number of CG iterations.
@@ -498,7 +499,8 @@ function run_simulation(;
 # We use the [`KPMPreconditioner`](@ref) type to accelerate the convergence of the CG calculations, thereby accelerating the simulations.
 
     ## Initialize KPM preconditioner.
-    kpm_preconditioner = KPMPreconditioner(fermion_det_matrix, rng = rng)
+    # preconditioner = KPMPreconditioner(fermion_det_matrix, rng = rng)
+    preconditioner = I
 
 # Finally, we initialize an instance of the [`GreensEstimator`](@ref) type, which is for
 # estimating fermionic correlation functions when making measurements.
@@ -541,7 +543,7 @@ function run_simulation(;
     hmc_updater = EFAPFFHMCUpdater(
         electron_phonon_parameters = electron_phonon_parameters,
         Nt = Nt, Δt = Δt,
-        η = 0.0, # Regularization parameter for exact fourier acceleration (EFA)
+        η = Ω, # Regularization parameter for exact fourier acceleration (EFA)
         δ = 0.05 # Fractional max amplitude of noise added to time-step Δt before each HMC update.
     )
 
@@ -559,7 +561,7 @@ function run_simulation(;
             electron_phonon_parameters, pff_calculator,
             fermion_path_integral = fermion_path_integral,
             fermion_det_matrix = fermion_det_matrix,
-            preconditioner = kpm_preconditioner,
+            preconditioner = preconditioner,
             rng = rng, tol = tol, maxiter = maxiter
         )
 
@@ -574,7 +576,7 @@ function run_simulation(;
             electron_phonon_parameters, pff_calculator,
             fermion_path_integral = fermion_path_integral,
             fermion_det_matrix = fermion_det_matrix,
-            preconditioner = kpm_preconditioner,
+            preconditioner = preconditioner,
             rng = rng, tol = tol, maxiter = maxiter
         )
 
@@ -590,7 +592,7 @@ function run_simulation(;
             fermion_path_integral = fermion_path_integral,
             fermion_det_matrix = fermion_det_matrix,
             pff_calculator = pff_calculator,
-            preconditioner = kpm_preconditioner,
+            preconditioner = preconditioner,
             tol_action = tol, tol_force = sqrt(tol), maxiter = maxiter,
             rng = rng,
         )
@@ -618,7 +620,7 @@ function run_simulation(;
             electron_phonon_parameters, pff_calculator,
             fermion_path_integral = fermion_path_integral,
             fermion_det_matrix = fermion_det_matrix,
-            preconditioner = kpm_preconditioner,
+            preconditioner = preconditioner,
             rng = rng, tol = tol, maxiter = maxiter
         )
 
@@ -633,7 +635,7 @@ function run_simulation(;
             electron_phonon_parameters, pff_calculator,
             fermion_path_integral = fermion_path_integral,
             fermion_det_matrix = fermion_det_matrix,
-            preconditioner = kpm_preconditioner,
+            preconditioner = preconditioner,
             rng = rng, tol = tol, maxiter = maxiter
         )
 
@@ -649,7 +651,7 @@ function run_simulation(;
             fermion_path_integral = fermion_path_integral,
             fermion_det_matrix = fermion_det_matrix,
             pff_calculator = pff_calculator,
-            preconditioner = kpm_preconditioner,
+            preconditioner = preconditioner,
             tol_action = tol, tol_force = sqrt(tol), maxiter = maxiter,
             rng = rng,
         )
@@ -667,7 +669,7 @@ function run_simulation(;
             fermion_path_integral = fermion_path_integral,
             tight_binding_parameters = tight_binding_parameters,
             electron_phonon_parameters = electron_phonon_parameters,
-            preconditioner = kpm_preconditioner,
+            preconditioner = preconditioner,
             tol = tol, maxiter = maxiter,
             rng = rng
         )
