@@ -191,7 +191,7 @@ function mul_νRe∂Λ∂x!(
                     # iterate over imaginary time slices
                     for l in axes(Λ, 1)                    
                         # calculate c⋅Re[⟨v′|∂Λ/∂x|v⟩]
-                        Δτ∂Λ∂x = Δτ * (αc + 3*α3c * x[phonon,l]^2)/2 * Λ[l,phonon]
+                        Δτ∂Λ∂x = Δτ * (αc + 3*α3c * x[phonon,l]^2)/2 * Λ[l,site]
                         νRe∂Λ∂x[phonon,l] += ν * real( conj(v′[mod1(l-1,Lτ),site]) * Δτ∂Λ∂x * v[l,site] )
                     end
                 end
