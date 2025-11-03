@@ -23,7 +23,7 @@ end
         # Keyword Arguments
         electron_phonon_parameters::ElectronPhononParameters{T},
         Nt::Int,
-        Δt::E,
+        Δt::E = π/(2*Nt),
         η::E = 0.0,
         δ::E = 0.05
     ) where {T<:Number, E<:AbstractFloat}
@@ -41,7 +41,7 @@ function EFAPFFHMCUpdater(;
     # Keyword Arguments
     electron_phonon_parameters::ElectronPhononParameters{T},
     Nt::Int,
-    Δt::E,
+    Δt::E = π/(2*Nt),
     η::E = 0.0,
     δ::E = 0.05
 ) where {T<:Number, E<:AbstractFloat}

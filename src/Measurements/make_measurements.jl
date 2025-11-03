@@ -412,7 +412,7 @@ function make_composite_correlation_measurements!(
     Lτ = fermion_path_integral.Lτ
 
     # get correlation containers
-    (; time_displaced_composite_correlations, equaltime_composite_correlations) = measurement_container
+    (; time_displaced_composite_correlations, equaltime_composite_correlations, pfft!) = measurement_container
 
     # get temporarary correlation container
     tmp = greens_estimator.tmp
@@ -459,7 +459,7 @@ function make_composite_correlation_measurements!(
                     time_displaced_composite_correlations,
                     measurement, tmp,
                     unit_cell, lattice,
-                    index
+                    index, pfft!
                 )
             end 
 
@@ -475,7 +475,7 @@ function make_composite_correlation_measurements!(
                     time_displaced_composite_correlations,
                     measurement, tmp,
                     unit_cell, lattice,
-                    index
+                    index, pfft!
                 )
             end
 
@@ -491,7 +491,7 @@ function make_composite_correlation_measurements!(
                     time_displaced_composite_correlations,
                     measurement, tmp,
                     unit_cell, lattice,
-                    index
+                    index, pfft!
                 )
             end
 
@@ -507,7 +507,7 @@ function make_composite_correlation_measurements!(
                     time_displaced_composite_correlations,
                     measurement, tmp,
                     unit_cell, lattice,
-                    index
+                    index, pfft!
                 )
             end
         
@@ -525,7 +525,7 @@ function make_composite_correlation_measurements!(
                     time_displaced_composite_correlations,
                     measurement, tmp,
                     unit_cell, lattice,
-                    index
+                    index, pfft!
                 )
             end
 
@@ -541,7 +541,7 @@ function make_composite_correlation_measurements!(
                     time_displaced_composite_correlations,
                     measurement, tmp,
                     unit_cell, lattice,
-                    index
+                    index, pfft!
                 )
             end
 
@@ -559,7 +559,7 @@ function make_composite_correlation_measurements!(
                     time_displaced_composite_correlations,
                     measurement, tmp,
                     unit_cell, lattice,
-                    index
+                    index, pfft!
                 )
             end
 
@@ -577,7 +577,7 @@ function make_composite_correlation_measurements!(
                     time_displaced_composite_correlations,
                     measurement, tmp,
                     unit_cell, lattice,
-                    index
+                    index, pfft!
                 )
             end
 
@@ -595,7 +595,7 @@ function make_composite_correlation_measurements!(
                     time_displaced_composite_correlations,
                     measurement, tmp,
                     unit_cell, lattice,
-                    index
+                    index, pfft!
                 )
             end
 
@@ -631,7 +631,7 @@ function make_composite_correlation_measurements!(
                     time_displaced_composite_correlations,
                     measurement, tmp,
                     unit_cell, lattice,
-                    index
+                    index, pfft!
                 )
             end
 
@@ -667,7 +667,7 @@ function make_composite_correlation_measurements!(
                     time_displaced_composite_correlations,
                     measurement, tmp,
                     unit_cell, lattice,
-                    index
+                    index, pfft!
                 )
             end
 
@@ -703,7 +703,7 @@ function make_composite_correlation_measurements!(
                     time_displaced_composite_correlations,
                     measurement, tmp,
                     unit_cell, lattice,
-                    index
+                    index, pfft!
                 )
             end
         end
@@ -870,7 +870,8 @@ function copyto_composite_correlation_container!(
     tmp::AbstractArray{Complex{T}, Dp1},
     unit_cell::UnitCell{D,T},
     lattice::Lattice{D},
-    index::Int
+    index::Int,
+    pfft!::AbstractFFTs.Plan
 ) where {D, Dp1, T<:AbstractFloat}
 
     # record equal-time correlation measurements
@@ -894,7 +895,7 @@ function copyto_composite_correlation_container!(
     end
 
     # fourier transform to momentum space
-    fourier_transform!(tmp, r, D+1, unit_cell, lattice)
+    fourier_transform!(tmp, r, D+1, unit_cell, lattice, pfft!)
 
     # record equal-time structure factor measurements
     if measurement in keys(equaltime_composite_correlations)

@@ -8,6 +8,8 @@ docs/build/
 literate_scripts/*/
 example_scripts/*/
 *.jld2
+*.csv
+*.h5
 *.DS_Store
 .DS_Store
 /examples/*/

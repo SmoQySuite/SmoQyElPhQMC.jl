@@ -197,7 +197,7 @@ function run_simulation(
         model_geometry = model_geometry
     )
 
-    ## Define first local Holstein coupling for first phonon mode.
+    ## Define second local Holstein coupling for second phonon mode.
     holstein_coupling_2 = HolsteinCoupling(
         model_geometry = model_geometry,
         phonon_id = phonon_2_id,
@@ -207,7 +207,7 @@ function run_simulation(
         ph_sym_form = true,
     )
 
-    ## Add the first local Holstein coupling definition to the model.
+    ## Add the second local Holstein coupling definition to the model.
     holstein_coupling_2_id = add_holstein_coupling!(
         electron_phonon_model = electron_phonon_model,
         holstein_coupling = holstein_coupling_2,
@@ -340,7 +340,7 @@ function run_simulation(
         integrated = true
     )
 
-# ## Setup DQMC simulation
+# ## Setup QMC simulation
 # No changes need to made to this section of the code from the previous [2a) Honeycomb Holstein Model](@ref) tutorial.
 
     ## Allocate a single FermionPathIntegral for both spin-up and down electrons.
@@ -365,22 +365,17 @@ function run_simulation(
     ## Initialize Green's function estimator for making measurements.
     greens_estimator = GreensEstimator(fermion_det_matrix, model_geometry)
 
-# ## Setup EFA-HMC Updates
+# ## Setup EFA-PFF-HMC Updates
 # No changes need to made to this section of the code from the previous [2a) Honeycomb Holstein Model](@ref) tutorial.
 
 
-    ## Integrated trajectory time; one quarter the period of the bare phonon mode.
-    Tt = π/(2Ω)
+    ## Number of fermionic time-steps in HMC update.
+    Nt = 25
 
-    ## Fermionic time-step used in HMC update.
-    Δt = Tt/Nt
-
-    # Initialize Hamitlonian/Hybrid monte carlo (HMC) updater.
+    ## Initialize Hamitlonian/Hybrid monte carlo (HMC) updater.
     hmc_updater = EFAPFFHMCUpdater(
         electron_phonon_parameters = electron_phonon_parameters,
-        Nt = Nt, Δt = Δt,
-        η = Ω, # Regularization parameter for exact fourier acceleration (EFA)
-        δ = 0.05 # Fractional max amplitude of noise added to time-step Δt before each HMC update.
+        Nt = Nt, Δt = π/(2*Nt)
     )
 
 # ## Thermalize system
