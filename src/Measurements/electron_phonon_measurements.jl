@@ -39,7 +39,7 @@ function make_electron_phonon_measurements!(
         # make ssh coupling related measurements
         for ssh_id in 1:nssh
             ssh_parameters = electron_phonon_parameters.ssh_parameters_up
-            ϵ_ssh = measure_ssh_energy(ssh_parameters, greens_estimagor, x, ssh_id)
+            ϵ_ssh = measure_ssh_energy(ssh_parameters, greens_estimator, x, ssh_id)
             local_measurements["ssh_energy_up"][ssh_id] += ϵ_ssh
             local_measurements["ssh_energy_dn"][ssh_id] += ϵ_ssh
             local_measurements["ssh_energy"][ssh_id] += 2 * ϵ_ssh
@@ -140,8 +140,8 @@ function measure_ssh_energy(
     ssh_index_i = (ssh_id-1) * N + 1
     ssh_index_f = ssh_id * N
     slice = ssh_index_i:ssh_index_f
-    neighbor_table = @view ssh_parameters.neighbor_table[1, slice]
-    coupling_to_phonon = @view ssh_parameters.coupling_to_phonon[slice]
+    neighbor_table = @view ssh_parameters.neighbor_table[:, slice]
+    coupling_to_phonon = @view ssh_parameters.coupling_to_phonon[:, slice]
 
     # get views based on orbital ID
     GR = reshape(greens_estimator.Rt, Lτ, N, Nrv)
@@ -168,7 +168,7 @@ function measure_ssh_energy(
         # iterate over imaginary-time slices
         for l in 1:Lτ
             # get relative phonon displacement
-            Δx = x″[p_f, l] - x″[p_i, l]
+            Δx = x[p_f, l] - x[p_i, l]
             # calculate coupling
             c_ul = α1[u] * Δx + α2[u] * Δx^2 + α3[u] * Δx^3 + α4[u] * Δx^4
             # get forward hopping amplitude
@@ -181,7 +181,7 @@ function measure_ssh_energy(
     end
 
     # normalize measurement
-    ϵ_hol /= (N * Lτ)
+    ϵ_ssh /= (N * Lτ)
 
     return ϵ_ssh
 end

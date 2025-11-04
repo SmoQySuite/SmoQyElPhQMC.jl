@@ -43,7 +43,7 @@ function run_simulation(
     checkpoint_freq, # Frequency with which checkpoint files are written in hours.
     runtime_limit = Inf, # Simulation runtime limit in hours.
     Δτ = 0.05, # Discretization in imaginary time.
-    Nt = 100, # Numer of time-steps in HMC update.
+    Nt = 25, # Numer of time-steps in HMC update.
     Nrv = 10, # Number of random vectors used to estimate fermionic correlation functions.
     tol = 1e-10, # CG iterations tolerance.
     maxiter = 10_000, # Maximum number of CG iterations.
@@ -453,9 +453,6 @@ function run_simulation(
 # ## Setup EFA-PFF-HMC Updates
 # No changes need to made to this section of the code from the previous
 # [2c) Honeycomb Holstein Model with Checkpointing](@ref) tutorial.
-
-    ## Number of fermionic time-steps in HMC update.
-    Nt = 25
 
     ## Initialize Hamitlonian/Hybrid monte carlo (HMC) updater.
     hmc_updater = EFAPFFHMCUpdater(

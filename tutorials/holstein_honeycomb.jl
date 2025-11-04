@@ -62,7 +62,7 @@ function run_simulation(;
     N_updates, # Total number of measurements and measurement updates.
     N_bins, # Number of times bin-averaged measurements are written to file.
     Δτ = 0.05, # Discretization in imaginary time.
-    Nt = 10, # Numer of time-steps in HMC update.
+    Nt = 25, # Numer of time-steps in HMC update.
     Nrv = 10, # Number of random vectors used to estimate fermionic correlation functions.
     tol = 1e-10, # CG iterations tolerance.
     maxiter = 10_000, # Maximum number of CG iterations.
@@ -530,9 +530,6 @@ function run_simulation(;
 # Then, if the acceptance rate is too low you increase ``N_t,`` which implicitly results in a reduction of ``\Delta t.``
 # Conversely, if the acceptance rate is very high ``(\gtrsim 99 \% )`` it may be useful to decrease ``N_t``,
 # thereby increasing ``\Delta t,`` as this will reduce the computational cost of performing an EFA-HMC update.
-
-    ## Number of fermionic time-steps in HMC update.
-    Nt = 25
 
     ## Initialize Hamitlonian/Hybrid monte carlo (HMC) updater.
     hmc_updater = EFAPFFHMCUpdater(
