@@ -193,7 +193,7 @@ function measure_GΔ0!(
         _aperiodic_copyto!(A, GR_a_i)
         _aperiodic_copyto!(B, Rt_b_i)
 
-        # esimate Green's function
+        # estimate Green's function
         _translational_average!(GΔ0, A, B, pfft!, pifft!)
     end
 
@@ -219,7 +219,7 @@ end
 #                       = (1/N) sum_i ⟨a(i+r+r₁,τ)⋅bᵀ(i+r₂,0)⟩⋅⟨c(i+r+r₃,τ)⋅dᵀ(i+r₄,0)⟩
 #  for all Δ, where Δ = (r, τ) are displacements in space-time. The letters (a,b,c,d) denote
 # the orbital species, and (r_a,r_b,r_c,r_d) are static displacements in unit cells.
-# the sum over i runs over all N unit cells and averages over translation symmmetry.
+# the sum over i runs over all N unit cells and averages over translation symmetry.
 function measure_GΔ0_GΔ0!(
     correlation::AbstractArray{Complex{T},Dp1},
     greens_estimator::GreensEstimator{T},

@@ -46,6 +46,7 @@ using SmoQyElPhQMC
 using SmoQyDQMC
 import SmoQyDQMC.LatticeUtilities as lu
 
+using LinearAlgebra
 using Random
 using Printf
 ````
@@ -70,10 +71,10 @@ function run_simulation(;
     N_updates, # Total number of measurements and measurement updates.
     N_bins, # Number of times bin-averaged measurements are written to file.
     Δτ = 0.05, # Discretization in imaginary time.
-    Nt = 100, # Numer of time-steps in HMC update.
+    Nt = 25, # Numer of time-steps in HMC update.
     Nrv = 10, # Number of random vectors used to estimate fermionic correlation functions.
     tol = 1e-10, # CG iterations tolerance.
-    maxiter = 1000, # Maximum number of CG iterations.
+    maxiter = 10_000, # Maximum number of CG iterations.
     write_bins_concurrent = true, # Whether to write HDF5 bins during the simulation.
     seed = abs(rand(Int)), # Seed for random number generator.
     filepath = "." # Filepath to where data folder will be created.
@@ -117,32 +118,32 @@ The important metadata within the simulation will be recorded in the `metadata` 
     metadata = Dict()
 
     # Record simulation parameters.
-    metadata["N_therm"]   = N_therm    # Number of thermalization updates
+    metadata["N_therm"] = N_therm  # Number of thermalization updates
     metadata["N_updates"] = N_updates  # Total number of measurements and measurement updates
-    metadata["N_bins"]    = N_bins     # Number of times bin-averaged measurements are written to file
-    metadata["maxiter"]   = maxiter    # Maximum number of conjugate gradient iterations
-    metadata["tol"]       = tol        # Tolerance used for conjugate gradient solves
-    metadata["Nt"]        = Nt         # Number of time-steps in HMC update
-    metadata["Nrv"]       = Nrv        # Number of random vectors used to estimate fermionic correlation functions
-    metadata["seed"]      = seed       # Random seed used to initialize random number generator in simulation
+    metadata["N_bins"] = N_bins # Number of times bin-averaged measurements are written to file
+    metadata["maxiter"] = maxiter # Maximum number of conjugate gradient iterations
+    metadata["tol"] = tol # Tolerance used for conjugate gradient solves
+    metadata["Nt"] = Nt # Number of time-steps in HMC update
+    metadata["Nrv"] = Nrv # Number of random vectors used to estimate fermionic correlation functions
+    metadata["seed"] = seed  # Random seed used to initialize random number generator in simulation
 ````
 
 Here we also update variables to keep track of the acceptance rates for the various types of Monte Carlo updates
 that will be performed during the simulation. This will be discussed in more detail in later sections of the tutorial.
 
 ````julia
-    metadata["hmc_acceptance_rate"] = 0.0
-    metadata["reflection_acceptance_rate"] = 0.0
-    metadata["swap_acceptance_rate"] = 0.0
+    metadata["hmc_acceptance_rate"] = 0.0 # HMC acceptance rate
+    metadata["reflection_acceptance_rate"] = 0.0 # Reflection update acceptance rate
+    metadata["swap_acceptance_rate"] = 0.0 # Swap update acceptance rate
 ````
 
 Initialize variables to record the average number of CG iterations for each type of update and measurements.
 
 ````julia
-    metadata["hmc_iters"] = 0.0
-    metadata["reflection_iters"] = 0.0
-    metadata["swap_iters"] = 0.0
-    metadata["measurement_iters"] = 0.0
+    metadata["hmc_iters"] = 0.0 # Avg number of CG iteractions per solve in HMC update.
+    metadata["reflection_iters"] = 0.0 # Avg number of CG iterations per solve in reflection update.
+    metadata["swap_iters"] = 0.0 # Avg number of CG iterations per solve in swap update.
+    metadata["measurement_iters"] = 0.0 # Avg number of CG iterations per solve while making measurements.
 ````
 
 ## Initialize model
@@ -279,7 +280,7 @@ in each unit cell using the [`SmoQyDQMC.HolsteinCoupling`](@extref) type and [`S
         model_geometry = model_geometry
     )
 
-    # Define first local Holstein coupling for first phonon mode.
+    # Define second local Holstein coupling for second phonon mode.
     holstein_coupling_2 = HolsteinCoupling(
         model_geometry = model_geometry,
         phonon_id = phonon_2_id,
@@ -289,7 +290,7 @@ in each unit cell using the [`SmoQyDQMC.HolsteinCoupling`](@extref) type and [`S
         ph_sym_form = true,
     )
 
-    # Add the first local Holstein coupling definition to the model.
+    # Add the second local Holstein coupling definition to the model.
     holstein_coupling_2_id = add_holstein_coupling!(
         electron_phonon_model = electron_phonon_model,
         holstein_coupling = holstein_coupling_2,
@@ -547,7 +548,7 @@ We use the [`KPMPreconditioner`](@ref) type to accelerate the convergence of the
 
 ````julia
     # Initialize KPM preconditioner.
-    kpm_preconditioner = KPMPreconditioner(fermion_det_matrix, rng = rng)
+    preconditioner = KPMPreconditioner(fermion_det_matrix, rng = rng)
 ````
 
 Finally, we initialize an instance of the [`GreensEstimator`](@ref) type, which is for
@@ -558,47 +559,35 @@ estimating fermionic correlation functions when making measurements.
     greens_estimator = GreensEstimator(fermion_det_matrix, model_geometry)
 ````
 
-## [Setup EFA-HMC Updates](@id holstein_square_efa-hmc_updates)
-Before we begin the simulation, we also want to initialize an instance of the
-[`EFAPFFHMCUpdater`](@ref) type, which will be used to perform hybrid Monte Carlo (HMC)
-udpates to the phonon fields that use exact fourier acceleration (EFA)
-to further reduce autocorrelation times.
+## [Setup EFA-PFF-HMC Updates](@id holstein_square_efa-hmc_updates)
+Before we begin the simulation, we also want to initialize an instance of the [`EFAPFFHMCUpdater`](@ref) type,
+which will be used to perform hybrid Monte Carlo (HMC) updates to the phonon fields that use
+exact fourier acceleration (EFA) to further reduce autocorrelation times.
 
 The two main parameters that need to be specified are the time-step size ``\Delta t`` and number of time-steps ``N_t``
 performed in the HMC update, with the corresponding integrated trajectory time then equalling ``T_t = N_t \cdot \Delta t.``
-Note that the computational cost of an HMC update is linearly proportional to ``N_t,`` while the acceptance rate is inversely
-proportional to ``\Delta t.``
+Note that the computational cost of an HMC update is linearly proportional to ``N_t,`` while the acceptance rate is
+approximately proportional to ``1/(\Delta t)^2.``
 
 [Previous studies](https://arxiv.org/abs/2404.09723) have shown that a good place to start
-with the integrated trajectory time ``T_t`` is a quarter the period of the bare phonon mode,
-``T_t \approx \frac{1}{4} \left( \frac{2\pi}{\Omega} \right) = \pi/(2\Omega).``
-It is also important to keep the acceptance rate for the HMC updates above ``\sim 90\%`` to help prevent numerical instabilities from occuring.
+with the integrated trajectory time ``T_t`` is a quarter the period associated with the bare phonon frequency,
+``T_t \approx \frac{1}{4} \left( \frac{2\pi}{\Omega} \right) = \pi/(2\Omega).`` However, in our implementation we effectively normalize all of the
+bare phonon frequencies to unity in the dynamics. Therefore, a good choice for the trajectory time in our implementation is simply ``T_t = \pi/2``.
+Therefore, in most cases you simply need to select a value for ``N_t`` and then use the default assigned time-step ``\Delta t = \pi / (2 N_t)``,
+such that the trajectory length is held fixed at ``T_t = \pi/2``.
+With this convention the computational cost of performing updates still increases linearly with ``N_t``, but the acceptance rate also increases with ``N_t``.
+Note that it can be important to keep the acceptance rate for the HMC updates above ``\sim 90\%`` to avoid numerical instabilities from occuring.
 
-Based on user experience, a good (conservative) starting place is to set the number of time-step to ``N_t \approx 100,``
-and then set the time-step size to ``\Delta t \approx \pi/(2\Omega N_t),``
-effectively setting the integrated trajectory time to ``T_t = \pi/(2\Omega).``
-Then, if the acceptance rate is too low you increase ``N_t,`` which results in a reduction of ``\Delta t.``
-Conversely, if the acceptance rate is very high ``(\gtrsim 99 \% )`` it can be useful to decrease ``N_t``,
+Based on user experience, a good (conservative) starting place is to set the number of time-steps to ``N_t \approx 10.``
+Then, if the acceptance rate is too low you increase ``N_t,`` which implicitly results in a reduction of ``\Delta t.``
+Conversely, if the acceptance rate is very high ``(\gtrsim 99 \% )`` it may be useful to decrease ``N_t``,
 thereby increasing ``\Delta t,`` as this will reduce the computational cost of performing an EFA-HMC update.
 
-The following code initializes the EFA-HMC updater, and sets the time-step size and number of time-steps
-
 ````julia
-    # Integrated trajectory time; one quarter the period of the bare phonon mode.
-    Tt = π/(2Ω)
-
-    # Fermionic time-step used in HMC update.
-    Δt = Tt/Nt
-````
-
-Initialize Hamitlonian/Hybrid monte carlo (HMC) updater.
-
-````julia
+    # Initialize Hamitlonian/Hybrid monte carlo (HMC) updater.
     hmc_updater = EFAPFFHMCUpdater(
         electron_phonon_parameters = electron_phonon_parameters,
-        Nt = Nt, Δt = Δt,
-        η = 0.0, # Regularization parameter for exact fourier acceleration (EFA)
-        δ = 0.05 # Fractional max amplitude of noise added to time-step Δt before each HMC update.
+        Nt = Nt, Δt = π/(2*Nt)
     )
 ````
 
@@ -617,7 +606,7 @@ the [`hmc_update!`](@ref) function below, we will also perform reflection and sw
             electron_phonon_parameters, pff_calculator,
             fermion_path_integral = fermion_path_integral,
             fermion_det_matrix = fermion_det_matrix,
-            preconditioner = kpm_preconditioner,
+            preconditioner = preconditioner,
             rng = rng, tol = tol, maxiter = maxiter
         )
 
@@ -632,7 +621,7 @@ the [`hmc_update!`](@ref) function below, we will also perform reflection and sw
             electron_phonon_parameters, pff_calculator,
             fermion_path_integral = fermion_path_integral,
             fermion_det_matrix = fermion_det_matrix,
-            preconditioner = kpm_preconditioner,
+            preconditioner = preconditioner,
             rng = rng, tol = tol, maxiter = maxiter
         )
 
@@ -648,7 +637,7 @@ the [`hmc_update!`](@ref) function below, we will also perform reflection and sw
             fermion_path_integral = fermion_path_integral,
             fermion_det_matrix = fermion_det_matrix,
             pff_calculator = pff_calculator,
-            preconditioner = kpm_preconditioner,
+            preconditioner = preconditioner,
             tol_action = tol, tol_force = sqrt(tol), maxiter = maxiter,
             rng = rng,
         )
@@ -678,7 +667,7 @@ structure of this part of the code, refer to here.
             electron_phonon_parameters, pff_calculator,
             fermion_path_integral = fermion_path_integral,
             fermion_det_matrix = fermion_det_matrix,
-            preconditioner = kpm_preconditioner,
+            preconditioner = preconditioner,
             rng = rng, tol = tol, maxiter = maxiter
         )
 
@@ -693,7 +682,7 @@ structure of this part of the code, refer to here.
             electron_phonon_parameters, pff_calculator,
             fermion_path_integral = fermion_path_integral,
             fermion_det_matrix = fermion_det_matrix,
-            preconditioner = kpm_preconditioner,
+            preconditioner = preconditioner,
             rng = rng, tol = tol, maxiter = maxiter
         )
 
@@ -709,7 +698,7 @@ structure of this part of the code, refer to here.
             fermion_path_integral = fermion_path_integral,
             fermion_det_matrix = fermion_det_matrix,
             pff_calculator = pff_calculator,
-            preconditioner = kpm_preconditioner,
+            preconditioner = preconditioner,
             tol_action = tol, tol_force = sqrt(tol), maxiter = maxiter,
             rng = rng,
         )
@@ -727,7 +716,7 @@ structure of this part of the code, refer to here.
             fermion_path_integral = fermion_path_integral,
             tight_binding_parameters = tight_binding_parameters,
             electron_phonon_parameters = electron_phonon_parameters,
-            preconditioner = kpm_preconditioner,
+            preconditioner = preconditioner,
             tol = tol, maxiter = maxiter,
             rng = rng
         )
