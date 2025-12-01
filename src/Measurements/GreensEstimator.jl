@@ -11,13 +11,13 @@ struct GreensEstimator{T<:AbstractFloat, D, Dp1, Dp3, Tfft<:AbstractFFTs.Plan, T
     N::Int
     n::Int
     L::NTuple{D, Int}
-    tmp::AbstractArray{Complex{T}, Dp1}
-    CΔ0::AbstractArray{Complex{T}, Dp1}
-    Rt::AbstractArray{Complex{T}, Dp3}
-    GR::AbstractArray{Complex{T}, Dp3}
+    tmp::Array{Complex{T}, Dp1}
+    CΔ0::Array{Complex{T}, Dp1}
+    Rt::Array{Complex{T}, Dp3}
+    GR::Array{Complex{T}, Dp3}
     MtR::Vector{Complex{T}}
-    A::AbstractArray{Complex{T}, Dp1}
-    B::AbstractArray{Complex{T}, Dp1}
+    A::Array{Complex{T}, Dp1}
+    B::Array{Complex{T}, Dp1}
     pfft!::Tfft
     pifft!::Tifft
 end

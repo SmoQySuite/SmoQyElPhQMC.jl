@@ -114,7 +114,7 @@ The important metadata within the simulation will be recorded in the `metadata` 
     # Initialize random number generator
     rng = Xoshiro(seed)
 
-    # Initialize additiona_info dictionary
+    # Initialize metadata dictionary
     metadata = Dict()
 
     # Record simulation parameters.
@@ -140,7 +140,7 @@ that will be performed during the simulation. This will be discussed in more det
 Initialize variables to record the average number of CG iterations for each type of update and measurements.
 
 ````julia
-    metadata["hmc_iters"] = 0.0 # Avg number of CG iteractions per solve in HMC update.
+    metadata["hmc_iters"] = 0.0 # Avg number of CG iterations per solve in HMC update.
     metadata["reflection_iters"] = 0.0 # Avg number of CG iterations per solve in reflection update.
     metadata["swap_iters"] = 0.0 # Avg number of CG iterations per solve in swap update.
     metadata["measurement_iters"] = 0.0 # Avg number of CG iterations per solve while making measurements.
@@ -782,7 +782,7 @@ Again, for more information on how to interpret the output refer the [Simulation
 
 ````julia
     # Process the simulation results, calculating final error bars for all measurements.
-    # writing final statisitics to CSV files.
+    # writing final statistics to CSV files.
     process_measurements(
         datafolder = simulation_info.datafolder,
         n_bins = N_bins,
@@ -854,7 +854,7 @@ With this in mind, the following block of code only executes if the Julia script
 also reading in additional command line arguments.
 
 ````julia
-# Only excute if the script is run directly from the command line.
+# Only execute if the script is run directly from the command line.
 if abspath(PROGRAM_FILE) == @__FILE__
 
     # Run the simulation.

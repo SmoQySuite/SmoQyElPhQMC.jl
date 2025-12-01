@@ -15,7 +15,7 @@
 # is given by ``\hat{X}_{\langle i,j \rangle} \ (\hat{P}_{\langle i,j \rangle})``, where ``\Omega`` and ``M`` are the phonon frequency and associated ion mass respectively.
 # Lastly, the strength of the electron-phonon coupling is controlled by the parameter ``\alpha``.
 
-# Note that this example script comes with all the bells and whistles so to speak, including support for MPI parallelizaiton as well as checkpointing.
+# Note that this example script comes with all the bells and whistles so to speak, including support for MPI parallelization as well as checkpointing.
 
 using SmoQyElPhQMC
 using SmoQyDQMC
@@ -89,7 +89,7 @@ function run_simulation(
         ## Initialize random number generator
         rng = Xoshiro(seed)
 
-        ## Initialize additiona_info dictionary
+        ## Initialize metadata dictionary
         metadata = Dict()
 
         ## Record simulation parameters.
@@ -613,7 +613,7 @@ function run_simulation(
     save_simulation_info(simulation_info, metadata)
 
     ## Process the simulation results, calculating final error bars for all measurements.
-    ## writing final statisitics to CSV files.
+    ## writing final statistics to CSV files.
     process_measurements(
         comm;
         datafolder = simulation_info.datafolder,
@@ -654,7 +654,7 @@ function run_simulation(
     return nothing
 end # end of run_simulation function
 
-## Only excute if the script is run directly from the command line.
+## Only execute if the script is run directly from the command line.
 if abspath(PROGRAM_FILE) == @__FILE__
 
     ## Initialize MPI

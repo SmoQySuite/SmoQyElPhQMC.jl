@@ -1,7 +1,7 @@
 name = "SmoQyElPhQMC"
 uuid = "2e896e94-a4a1-44d3-bdd1-72a60ceb4988"
-authors = ["Benjamin Cohen-Stead <benwcs@gmail.com>", "Steven Johnston <sjohn145@utk.edu>"]
 version = "1.0.0-DEV"
+authors = ["Benjamin Cohen-Stead <benwcs@gmail.com>", "Steven Johnston <sjohn145@utk.edu>"]
 
 [deps]
 Checkerboard = "b297549e-c8cb-44e5-9c33-b7e2667db6fc"
@@ -19,6 +19,9 @@ SmoQyKPMCore = "30e33e58-a96a-4fec-8c75-57692dd3ff18"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 TestItemRunner = "f8b46487-2199-4994-9208-9a1283c18c0a"
+
+[sources]
+SmoQyDQMC = {rev = "dev", url = "https://github.com/SmoQySuite/SmoQyDQMC.jl.git"}
 
 [compat]
 Checkerboard = "1.2"

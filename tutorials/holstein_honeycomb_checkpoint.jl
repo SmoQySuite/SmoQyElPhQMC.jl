@@ -105,7 +105,7 @@ function run_simulation(
         ## Initialize random number generator
         rng = Xoshiro(seed)
 
-        ## Initialize additiona_info dictionary
+        ## Initialize metadata dictionary
         metadata = Dict()
 
         ## Record simulation parameters.
@@ -120,7 +120,7 @@ function run_simulation(
         metadata["hmc_acceptance_rate"] = 0.0 # HMC acceptance rate
         metadata["reflection_acceptance_rate"] = 0.0 # Reflection update acceptance rate
         metadata["swap_acceptance_rate"] = 0.0 # Swap update acceptance rate
-        metadata["hmc_iters"] = 0.0 # Avg number of CG iteractions per solve in HMC update.
+        metadata["hmc_iters"] = 0.0 # Avg number of CG iterations per solve in HMC update.
         metadata["reflection_iters"] = 0.0 # Avg number of CG iterations per solve in reflection update.
         metadata["swap_iters"] = 0.0 # Avg number of CG iterations per solve in swap update.
         metadata["measurement_iters"] = 0.0 # Avg number of CG iterations per solve while making measurements.
@@ -664,7 +664,7 @@ function run_simulation(
 # This function also deletes the checkpoint files that were written during the simulation.
 
     ## Process the simulation results, calculating final error bars for all measurements.
-    ## writing final statisitics to CSV files.
+    ## writing final statistics to CSV files.
     process_measurements(
         comm,
         datafolder = simulation_info.datafolder,
@@ -723,7 +723,7 @@ end # end of run_simulation function
 # This is a useful feature when submitting jobs on a cluster, as it allows the same job file to be used for
 # both starting new simulations and resuming ones that still need to finish.
 
-## Only excute if the script is run directly from the command line.
+## Only execute if the script is run directly from the command line.
 if abspath(PROGRAM_FILE) == @__FILE__
 
     ## Initialize MPI

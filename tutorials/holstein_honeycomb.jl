@@ -101,7 +101,7 @@ function run_simulation(;
     ## Initialize random number generator
     rng = Xoshiro(seed)
 
-    ## Initialize additiona_info dictionary
+    ## Initialize metadata dictionary
     metadata = Dict()
 
     ## Record simulation parameters.
@@ -119,7 +119,7 @@ function run_simulation(;
     metadata["reflection_acceptance_rate"] = 0.0 # Reflection update acceptance rate
     metadata["swap_acceptance_rate"] = 0.0 # Swap update acceptance rate
 # Initialize variables to record the average number of CG iterations for each type of update and measurements.
-    metadata["hmc_iters"] = 0.0 # Avg number of CG iteractions per solve in HMC update.
+    metadata["hmc_iters"] = 0.0 # Avg number of CG iterations per solve in HMC update.
     metadata["reflection_iters"] = 0.0 # Avg number of CG iterations per solve in reflection update.
     metadata["swap_iters"] = 0.0 # Avg number of CG iterations per solve in swap update.
     metadata["measurement_iters"] = 0.0 # Avg number of CG iterations per solve while making measurements.
@@ -719,7 +719,7 @@ function run_simulation(;
 # Again, for more information on how to interpret the output refer the [Simulation Output Overview](@ref) page.
 
     ## Process the simulation results, calculating final error bars for all measurements.
-    ## writing final statisitics to CSV files.
+    ## writing final statistics to CSV files.
     process_measurements(
         datafolder = simulation_info.datafolder,
         n_bins = N_bins,
@@ -783,7 +783,7 @@ end # end of run_simulation function
 # With this in mind, the following block of code only executes if the Julia script is run from the command line,
 # also reading in additional command line arguments.
 
-## Only excute if the script is run directly from the command line.
+## Only execute if the script is run directly from the command line.
 if abspath(PROGRAM_FILE) == @__FILE__
 
     ## Run the simulation.

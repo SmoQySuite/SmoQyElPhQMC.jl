@@ -130,7 +130,7 @@ function measure_bare_hopping_energy(
     Rt = reshape(greens_estimator.Rt, (Lτ, Nsites, Nrv))
 
     # iterate over random vector
-    for rv in 1:Nrv
+    @inbounds for rv in 1:Nrv
         # iterate over hoppings
         for m in 1:N
             # get the pair of sites connected by the hopping
@@ -144,7 +144,9 @@ function measure_bare_hopping_energy(
                 # h = -t⋅cᵀ(i+r)⋅c(i)  - tᵀ⋅cᵀ(i)⋅c(i+r)
                 #   = +t⋅c(i)⋅cᵀ(i+r)  + tᵀ⋅c(i+r)⋅cᵀ(i)
                 #   ≈ +t⋅GR(i)⋅Rt(i+r) + tᵀ⋅GR(i+r)⋅Rt(i)
-                h += t_if * GR[l,i,rv] * Rt[l,f,rv] + conj(t_if) * GR[l,f,rv] * Rt[l,i,rv]
+                a = t_if * GR[l,i,rv] * Rt[l,f,rv]
+                b = conj(t_if) * GR[l,f,rv] * Rt[l,i,rv]
+                h += a + b
             end
         end
     end
@@ -192,14 +194,16 @@ function measure_hopping_energy(
             i = neighbor_table[1,m] # initial site
             f = neighbor_table[2,m] # final site
             # iterate over imaginary-time slice
-            @simd for l in 1:Lτ
+            for l in 1:Lτ
                 # get the hopping amplitude
                 t_if = t[m,l]
                 # calculate hopping energy of current unit cell
                 # h = -t⋅cᵀ(i+r)⋅c(i)  - tᵀ⋅cᵀ(i)⋅c(i+r)
                 #   = +t⋅c(i)⋅cᵀ(i+r)  + tᵀ⋅c(i+r)⋅cᵀ(i)
                 #   ≈ +t⋅GR(i)⋅Rt(i+r) + tᵀ⋅GR(i+r)⋅Rt(i)
-                h += t_if * GR[l,i,rv] * Rt[l,f,rv] + conj(t_if) * GR[l,f,rv] * Rt[l,i,rv]
+                a = t_if * GR[l,i,rv] * Rt[l,f,rv]
+                b = conj(t_if) * GR[l,f,rv] * Rt[l,i,rv]
+                h += a + b
             end
         end
     end
