@@ -617,7 +617,7 @@ function _measure_CΔ0!(
 end
 
 
-# aperiodic element-wise product
+# periodic element-wise product
 function _periodic_prod!(
     ab::AbstractArray{T, Dp1},
     a::AbstractArray{T, Dp1},
@@ -630,11 +630,24 @@ function _periodic_prod!(
     ab′ = selectdim(ab, 1, 1:Lτ)
     ab″ = selectdim(ab, 1, (Lτ+1):(2*Lτ))
     if isnothing(t)
-        @. ab′ = a * b
+        @inbounds @simd for c in eachindex(a, b, ab′, ab″)
+            val = a[c] * b[c]
+            ab′[c] = val
+            ab″[c] = val
+        end
+    elseif conj_t
+        @inbounds @simd for c in eachindex(a, b, ab′, ab″)
+            val = conj(t[c]) * a[c] * b[c]
+            ab′[c] = val
+            ab″[c] = val
+        end
     else
-        @. ab′ = conj_t ? (conj(t) * a * b) : (t * a * b)
+        @inbounds @simd for c in eachindex(a, b, ab′, ab″)
+            val = t[c] * a[c] * b[c]
+            ab′[c] = val
+            ab″[c] = val
+        end
     end
-    copyto!(ab″, ab′)
 
     return nothing
 end
@@ -646,12 +659,14 @@ function _aperiodic_copyto!(
     a::AbstractArray{T, D}
 ) where {D, T<:Number}
 
-    # length of first dimension
-    L = size(a, 1)
-    ap′ = selectdim(ap, 1, 1:L)
-    ap″ = selectdim(ap, 1, (L+1):(2*L))
-    copyto!(ap′, a)
-    @. ap″ = -ap′
+    Lτ = size(a, 1)
+    ap′ = selectdim(ap, 1, 1:Lτ)
+    ap″ = selectdim(ap, 1, (Lτ+1):(2*Lτ))
+    @inbounds @simd for i in eachindex(ap′, ap″, a)
+        val = a[i]
+        ap′[i] = val
+        ap″[i] = -val
+    end
 
     return nothing
 end
@@ -669,19 +684,26 @@ function _translational_average!(
 ) where {D, T<:AbstractFloat}
 
     Lτ = size(S, 1) - 1
+    
+    # FFT transforms
     mul!(a, pfft!, a)
     mul!(b, pifft!, b)
-    ab = a
-    @. ab = a * b
-    mul!(ab, pifft!, ab)
-    # record the result for τ ∈ [0,β-Δτ]
+    
+    # Element-wise product
+    @. a = a * b
+    
+    # Inverse FFT
+    mul!(a, pifft!, a)
+    
+    # Record the result for τ ∈ [0,β-Δτ]
     S′ = selectdim(S, 1, 1:Lτ)
-    ab′ = selectdim(ab, 1, 1:Lτ)
-    @. S′ += ab′
-    # deal with τ = β boundary condition where S[β] = S[0]
+    a′ = selectdim(a, 1, 1:Lτ)
+    @. S′ += a′
+    
+    # Deal with τ = β boundary condition where S[β] = S[0]
     S″ = selectdim(S, 1, Lτ+1)
-    ab″ = selectdim(ab, 1, 1)
-    @. S″ += ab″
+    a″ = selectdim(a, 1, 1)
+    @. S″ += a″
 
     return nothing
 end
@@ -713,4 +735,4 @@ function add_contraction_to_correlation!(
 end
 
 # boolean conjugation operation
-bconj(x::Number, b::Bool) = b ? conj(x) : x
+@inline bconj(x::Number, b::Bool) = b ? conj(x) : x
