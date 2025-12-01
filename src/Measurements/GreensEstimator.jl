@@ -130,7 +130,7 @@ function update_greens_estimator!(
     #     R[i] = randn(rng, E)
     # end
 
-    # udpate preconditioner
+    # update preconditioner
     update_preconditioner!(preconditioner, fermion_det_matrix, rng)
 
     # iterate over random vectors
@@ -261,7 +261,7 @@ function measure_GΔ0_GΔ0!(
     # get number of random vectors
     Nrv = size(Rt, ndims(Rt))
 
-    # get number of pairs of random vectros
+    # get number of pairs of random vectors
     Npairs = binomial(Nrv, 2)
 
     # iterate over all pairs of random vectors
@@ -374,7 +374,7 @@ end
 #                       = (1/N) sum_i ⟨a(i+r+r₁,τ)⋅bᵀ(i+r+r₂,τ)⟩⋅⟨c(i+r₃,0)⋅dᵀ(i+r₄,0)⟩
 # for all Δ, where Δ = (r, τ) are displacements in space-time. The letters (a,b,c,d) denote
 # the orbital species, and (r_a,r_b,r_c,r_d) are static displacements in unit cells.
-# the sum over i runs over all N unit cells and averages over translation symmmetry.
+# the sum over i runs over all N unit cells and averages over translation symmetry.
 function measure_GΔΔ_G00!(
     correlation::AbstractArray{Complex{T}, Dp1},
     greens_estimator::GreensEstimator{T},
@@ -416,7 +416,7 @@ function measure_GΔΔ_G00!(
     # get number of random vectors
     Nrv = size(Rt, ndims(Rt))
 
-    # get number of pairs of random vectros
+    # get number of pairs of random vectors
     Npairs = binomial(Nrv, 2)
 
     # iterate over all pairs of random vectors
@@ -453,7 +453,7 @@ end
 #                       = (1/N) sum_i -⟨bᵀ(i+r+r₁,τ)⋅a(i+r₂,0)⟩⋅⟨c(i+r+r₃,τ)⋅dᵀ(i+r₄,0)⟩
 # for all Δ, where Δ = (r, τ) are displacements in space-time. The letters (a,b,c,d) denote
 # the orbital species, and (r_a,r_b,r_c,r_d) are static displacements in unit cells.
-# the sum over i runs over all N unit cells and averages over translation symmmetry.
+# the sum over i runs over all N unit cells and averages over translation symmetry.
 function measure_G0Δ_GΔ0!(
     correlation::AbstractArray{Complex{T}, Dp1},
     greens_estimator::GreensEstimator{T},
@@ -495,7 +495,7 @@ function measure_G0Δ_GΔ0!(
     # get number of random vectors
     Nrv = size(Rt, ndims(Rt))
 
-    # get number of pairs of random vectros
+    # get number of pairs of random vectors
     Npairs = binomial(Nrv, 2)
 
     # iterate over all pairs of random vectors
