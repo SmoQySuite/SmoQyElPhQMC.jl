@@ -1,15 +1,17 @@
 @doc raw"""
     update_chemical_potential!(
+        # ARGUMENTS
         fermion_det_matrix::FermionDetMatrix{T,E},
         greens_estimator::GreensEstimator{E,D};
+        # KEYWORD ARGUMENTS
         chemical_potential_tuner::MuTunerLogger{E,T},
         tight_binding_parameters::TightBindingParameters{T,E},
         fermion_path_integral::FermionPathIntegral{T,E},
         preconditioner = I,
         rng::AbstractRNG = Random.default_rng(),
         update_greens_estimator::Bool = true,
-        tol::E = fermion_det_matrix.cg.tol,
-        maxiter::Int = fermion_det_matrix.cg.maxiter
+        tol::E = fermion_det_matrix.cgs.tol,
+        maxiter::Int = fermion_det_matrix.cgs.maxiter
     ) where {D, T<:Number, E<:AbstractFloat}
 
 Update the chemical potential ``\mu`` in the simulation to approach the target density/filling.
@@ -17,21 +19,26 @@ If `update_greens_estimator = true`, then `greens_estimator` is initialized to r
 state of the `fermion_det_matrix`.
 """
 function update_chemical_potential!(
+    # ARGUMENTS
     fermion_det_matrix::FermionDetMatrix{T,E},
     greens_estimator::GreensEstimator{E,D};
+    # KEYWORD ARGUMENTS
     chemical_potential_tuner::MuTunerLogger{E,T},
     tight_binding_parameters::TightBindingParameters{T,E},
     fermion_path_integral::FermionPathIntegral{T,E},
     preconditioner = I,
     rng::AbstractRNG = Random.default_rng(),
     update_greens_estimator::Bool = true,
-    tol::E = fermion_det_matrix.cg.tol,
-    maxiter::Int = fermion_det_matrix.cg.maxiter
+    tol::E = fermion_det_matrix.cgs.tol,
+    maxiter::Int = fermion_det_matrix.cgs.maxiter
 ) where {D, T<:Number, E<:AbstractFloat}
+
+    # number of iteration to perform solves
+    iters = 0
 
     # initialize the Green's function estimator to reflect the current fermion determinant matrix
     if update_greens_estimator
-        update_greens_estimator!(
+        iters = update_greens_estimator!(
             greens_estimator, fermion_det_matrix,
             preconditioner = preconditioner,
             rng = rng, maxiter = maxiter, tol = tol
@@ -63,5 +70,5 @@ function update_chemical_potential!(
     # update the fermion determinant matrix
     update!(fermion_det_matrix, fermion_path_integral)
 
-    return nothing
+    return iters
 end

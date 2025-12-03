@@ -515,7 +515,7 @@ function make_composite_correlation_measurements!(
 
             for index in eachindex(id_pairs)
                 fill!(tmp, 0)
-                j, i = id_pairs
+                j, i = id_pairs[index]
                 b″ = bonds[j]
                 b′ = bonds[i]
                 coef = coefficients[index]

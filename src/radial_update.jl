@@ -56,7 +56,7 @@ function radial_update!(
 
     # whether the exponentiated on-site energy matrix needs to be updated with the phonon field,
     # true if phonon mode appears in holstein coupling
-    calculate_exp_V = (holsein_parameters.nholstein > 0)
+    calculate_exp_V = (holstein_parameters.nholstein > 0)
 
     # whether the exponentiated hopping matrix needs to be updated with the phonon field,
     # true if phonon mode appears in SSH coupling
@@ -93,7 +93,7 @@ function radial_update!(
     # Calculate total initial action
     S = Sf + Sb
 
-    # substract off the effect of the current phonon configuration on the fermion path integrals
+    # subtract off the effect of the current phonon configuration on the fermion path integrals
     if calculate_exp_V
         SmoQyDQMC.update!(fermion_path_integral, holstein_parameters, x, -1)
     end
@@ -139,7 +139,7 @@ function radial_update!(
     # if update is rejected
     else
         accepted = false
-        # substract off the effect of the current phonon configuration on the fermion path integrals
+        # subtract off the effect of the current phonon configuration on the fermion path integrals
         if calculate_exp_V
             SmoQyDQMC.update!(fermion_path_integral, holstein_parameters, x, -1)
         end

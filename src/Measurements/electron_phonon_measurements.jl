@@ -71,7 +71,7 @@ function measure_holstein_energy(
     # initialize holstein electron-phonon coupling energy to zero
     ϵ_hol = zero(Complex{E})
 
-    # if using particle-hole symmetric defintion
+    # if using particle-hole symmetric definition
     phs = ph_sym_form[holstein_id]
 
     # get phonon fields associated with coupling ID
@@ -144,8 +144,8 @@ function measure_ssh_energy(
     coupling_to_phonon = @view ssh_parameters.coupling_to_phonon[:, slice]
 
     # get views based on orbital ID
-    GR = reshape(greens_estimator.Rt, Lτ, N, Nrv)
-    Rt = reshape(greens_estimator.Rt, Lτ, N, Nrv)
+    GR = reshape(greens_estimator.GR, Lτ, N*n, Nrv)
+    Rt = reshape(greens_estimator.Rt, Lτ, N*n, Nrv)
 
     # get coupling parameters
     α1_all = reshape(ssh_parameters.α, N, nssh)
@@ -163,7 +163,7 @@ function measure_ssh_energy(
     for u in 1:N
         # get pair of sites
         s_i, s_f = neighbor_table[1,u], neighbor_table[2,u]
-        # get pair of phonnon modes
+        # get pair of phonon modes
         p_i, p_f = coupling_to_phonon[1,u], coupling_to_phonon[2,u]
         # iterate over imaginary-time slices
         for l in 1:Lτ
