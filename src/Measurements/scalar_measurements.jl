@@ -63,7 +63,7 @@ function measure_Nsqrd(
             # approximate TrG
             TrGj = dot(Rj, GRj)
             # approximate ⟨N⟩² = 4⋅(Tr[I]-Tr[G])⋅(Tr[I]-Tr[G])/Lτ²
-            # using two indpendent random vectors where Tr[I] = V
+            # using two independent random vectors where Tr[I] = V
             N̄sqrd +=  4 * (V - TrGi) * (V - TrGj) / Lτ^2
         end
     end

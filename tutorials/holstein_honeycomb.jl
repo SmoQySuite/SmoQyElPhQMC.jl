@@ -1,7 +1,7 @@
 # # 1a) Honeycomb Holstein Model
 
 # In this example we reimplement the
-# [SmoQyDQMC tuturial](https://smoqysuite.github.io/SmoQyDQMC.jl/stable/tutorials/holstein_honeycomb/)
+# [SmoQyDQMC tutorial](https://smoqysuite.github.io/SmoQyDQMC.jl/stable/tutorials/holstein_honeycomb/)
 # on simulating the Holstein model on a Honeycomb lattice using [SmoQyElPhQMC](https://github.com/SmoQySuite/SmoQyElPhQMC.jl.git).
 # The Holstein Hamiltonian is given by
 # ```math
@@ -23,8 +23,8 @@
 
 # ## Import packages
 # First, we begin by importing the necessary packages.
-# The [SmoQyElPhQMC](https://github.com/SmoQySuite/SmoQyElPhQMC.jl.git) package is built as an extension pacakge on top of
-# [SmoQyDQMC](https://github.com/SmoQySuite/SmoQyDQMC.jl.git), enabling the simulution of strictly spin-symmetric electron-phonon models.
+# The [SmoQyElPhQMC](https://github.com/SmoQySuite/SmoQyElPhQMC.jl.git) package is built as an extension package on top of
+# [SmoQyDQMC](https://github.com/SmoQySuite/SmoQyDQMC.jl.git), enabling the simulation of strictly spin-symmetric electron-phonon models.
 # Therefore, in addition to importing [SmoQyElPhQMC](https://github.com/SmoQySuite/SmoQyElPhQMC.jl.git),
 # we also need to import [SmoQyDQMC](https://github.com/SmoQySuite/SmoQyDQMC.jl.git).
 # The [SmoQyDQMC](https://github.com/SmoQySuite/SmoQyDQMC.jl.git) package also then rexports 
@@ -62,7 +62,7 @@ function run_simulation(;
     N_updates, # Total number of measurements and measurement updates.
     N_bins, # Number of times bin-averaged measurements are written to file.
     Δτ = 0.05, # Discretization in imaginary time.
-    Nt = 25, # Numer of time-steps in HMC update.
+    Nt = 25, # Number of time-steps in HMC update.
     Nrv = 10, # Number of random vectors used to estimate fermionic correlation functions.
     tol = 1e-10, # CG iterations tolerance.
     maxiter = 10_000, # Maximum number of CG iterations.
@@ -128,7 +128,7 @@ function run_simulation(;
 # The next step is define the model we wish to simulate.
 # In this example the relevant model parameters the phonon energy ``\Omega`` (`Ω`), electron-phonon coupling ``\alpha`` (`α`),
 # chemical potential ``\mu`` (`μ`), and lattice size ``L`` (`L`).
-# The neasrest-neighbor hopping amplitude and phonon mass are normalized to unity, ``t = M = 1``.
+# The nearest-neighbor hopping amplitude and phonon mass are normalized to unity, ``t = M = 1``.
 
 # First we define the lattice geometry for our model, relying on the
 # [LatticeUtilities](https://github.com/SmoQySuite/LatticeUtilities.jl.git) package to do so.
@@ -181,7 +181,7 @@ function run_simulation(;
 
 # Next we specify the Honeycomb tight-binding term in our Hamiltonian with the [`SmoQyDQMC.TightBindingModel`](@extref) type.
 
-    ## Set neartest-neighbor hopping amplitude to unity,
+    ## Set nearest-neighbor hopping amplitude to unity,
     ## setting the energy scale in the model.
     t = 1.0
 
@@ -305,7 +305,7 @@ function run_simulation(;
         rng = rng
     )
 
-# ## Initialize meuasurements
+# ## Initialize measurements
 # Having initialized both our model and the corresponding model parameters,
 # the next step is to initialize the various measurements we want to make during our DQMC simulation.
 
@@ -531,7 +531,7 @@ function run_simulation(;
 # Conversely, if the acceptance rate is very high ``(\gtrsim 99 \% )`` it may be useful to decrease ``N_t``,
 # thereby increasing ``\Delta t,`` as this will reduce the computational cost of performing an EFA-HMC update.
 
-    ## Initialize Hamitlonian/Hybrid monte carlo (HMC) updater.
+    ## Initialize Hamiltonian/Hybrid monte carlo (HMC) updater.
     hmc_updater = EFAPFFHMCUpdater(
         electron_phonon_parameters = electron_phonon_parameters,
         Nt = Nt, Δt = π/(2*Nt)
@@ -690,7 +690,7 @@ function run_simulation(;
 # ## Record simulation metadata
 # At this point we are done sampling and taking measurements.
 # Next, we want to calculate the final acceptance rate for the various types of
-# udpates we performed, as well as write the simulation metadata to file,
+# updates we performed, as well as write the simulation metadata to file,
 # including the contents of the `metadata` dictionary.
 
     ## Calculate acceptance rates.
@@ -731,7 +731,7 @@ function run_simulation(;
 
 # A common measurement that needs to be computed at the end of a DQMC simulation is something called the correlation
 # ratio with respect to the ordering wave-vector for a specified type of structure factor measured during the simulation.
-# In the case of the honeycomb Holstein model, we are interested in measureing the correlation ratio
+# In the case of the honeycomb Holstein model, we are interested in measuring the correlation ratio
 # ```math
 # R_\text{cdw}(0) = 1 - \frac{1}{4} \sum_{\delta\mathbf{q}} \frac{S_\text{cdw}(0 + \delta\mathbf{q})}{S_\text{cdw}(0)}
 # ```
@@ -739,7 +739,7 @@ function run_simulation(;
 # equal-time structure factor corresponding to the composite correlation function ``C_\text{cdw}(\mathbf{r},\tau)`` defined earlier in this tutorial.
 # Note that the CDW ordering wave-vector is ``\mathbf{Q}_\text{cdw} = 0`` in this case, which describes the electrons preferentially
 # localizing on one of the two sub-lattices of the honeycomb lattice.
-# The sum over ``\delta\mathbf{q}`` runs over the four wave-vectors that neigbor ``\mathbf{Q}_\text{cdw} = 0.``
+# The sum over ``\delta\mathbf{q}`` runs over the four wave-vectors that neighbor ``\mathbf{Q}_\text{cdw} = 0.``
 
 # Here we use the [`compute_composite_correlation_ratio`](@ref) function to compute to compute this correlation ratio.
 # Note that the ``\mathbf{Q}_\text{cdw} = 0`` is specified using the `q_point` keyword argument, and the four neighboring wave-vectors
@@ -747,7 +747,7 @@ function run_simulation(;
 # These wave-vectors are specified using the convention described [here](@ref vector_reporting_conventions) in the [Simulation Output Overview](@ref) page.
 # Note that because the honeycomb lattice has a ``C_6`` rotation symmetry, each wave-vector in momentum-space has six nearest-neighbor wave-vectors.
 # Below we specify all six wave-vectors that neighbor the ``\mathbf{Q}_\text{cdw} = 0`` wave-vector ordering wave-vector, accounting for the fact
-# that the Brilliouin zone is periodic in the reciprocal lattice vectors.
+# that the Brillouin zone is periodic in the reciprocal lattice vectors.
 
     ## Calculate CDW correlation ratio.
     Rcdw, ΔRcdw = compute_composite_correlation_ratio(
@@ -808,6 +808,6 @@ end
 # at half-filling ``(\mu = 0)`` and inverse temperature ``\beta = 4.0``.
 # The phonon energy is set to ``\Omega = 1.0`` and the electron-phonon coupling is set to ``\alpha = 1.5.``
 # In the DQMC simulation, 5,000 EFA-HMC, reflection and swap updates are performed to thermalize the system.
-# Then an additional 10,000 such udpates are performed, after each of set of which measurements are made.
+# Then an additional 10,000 such updates are performed, after each of set of which measurements are made.
 # During the simulation, bin-averaged measurements are written to file 100 times,
 # with each bin of data containing the average of 10,000/100 = 100 sequential measurements.

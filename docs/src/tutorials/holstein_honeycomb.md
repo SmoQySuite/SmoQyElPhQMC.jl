@@ -71,7 +71,7 @@ function run_simulation(;
     N_updates, # Total number of measurements and measurement updates.
     N_bins, # Number of times bin-averaged measurements are written to file.
     Δτ = 0.05, # Discretization in imaginary time.
-    Nt = 25, # Numer of time-steps in HMC update.
+    Nt = 25, # Number of time-steps in HMC update.
     Nrv = 10, # Number of random vectors used to estimate fermionic correlation functions.
     tol = 1e-10, # CG iterations tolerance.
     maxiter = 10_000, # Maximum number of CG iterations.
@@ -206,7 +206,7 @@ All of this information regarding the lattice geometry is then stored in an inst
 Next we specify the Honeycomb tight-binding term in our Hamiltonian with the [`SmoQyDQMC.TightBindingModel`](@extref) type.
 
 ````julia
-    # Set neartest-neighbor hopping amplitude to unity,
+    # Set nearest-neighbor hopping amplitude to unity,
     # setting the energy scale in the model.
     t = 1.0
 
@@ -341,7 +341,7 @@ For instance, we need to initialize a seperate number to represent the on-site e
     )
 ````
 
-## Initialize meuasurements
+## Initialize measurements
 Having initialized both our model and the corresponding model parameters,
 the next step is to initialize the various measurements we want to make during our DQMC simulation.
 
@@ -584,7 +584,7 @@ Conversely, if the acceptance rate is very high ``(\gtrsim 99 \% )`` it may be u
 thereby increasing ``\Delta t,`` as this will reduce the computational cost of performing an EFA-HMC update.
 
 ````julia
-    # Initialize Hamitlonian/Hybrid monte carlo (HMC) updater.
+    # Initialize Hamiltonian/Hybrid monte carlo (HMC) updater.
     hmc_updater = EFAPFFHMCUpdater(
         electron_phonon_parameters = electron_phonon_parameters,
         Nt = Nt, Δt = π/(2*Nt)
@@ -750,7 +750,7 @@ using the [`merge_bins`](@extref) function.
 ## Record simulation metadata
 At this point we are done sampling and taking measurements.
 Next, we want to calculate the final acceptance rate for the various types of
-udpates we performed, as well as write the simulation metadata to file,
+updates we performed, as well as write the simulation metadata to file,
 including the contents of the `metadata` dictionary.
 
 ````julia
@@ -880,7 +880,7 @@ runs a DQMC simulation of a Holstein model on a ``3 \times 3`` unit cell (`N = 2
 at half-filling ``(\mu = 0)`` and inverse temperature ``\beta = 4.0``.
 The phonon energy is set to ``\Omega = 1.0`` and the electron-phonon coupling is set to ``\alpha = 1.5.``
 In the DQMC simulation, 5,000 EFA-HMC, reflection and swap updates are performed to thermalize the system.
-Then an additional 10,000 such udpates are performed, after each of set of which measurements are made.
+Then an additional 10,000 such updates are performed, after each of set of which measurements are made.
 During the simulation, bin-averaged measurements are written to file 100 times,
 with each bin of data containing the average of 10,000/100 = 100 sequential measurements.
 

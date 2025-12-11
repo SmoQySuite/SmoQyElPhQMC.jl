@@ -43,7 +43,7 @@ function run_simulation(
     checkpoint_freq, # Frequency with which checkpoint files are written in hours.
     runtime_limit = Inf, # Simulation runtime limit in hours.
     Δτ = 0.05, # Discretization in imaginary time.
-    Nt = 25, # Numer of time-steps in HMC update.
+    Nt = 25, # Number of time-steps in HMC update.
     Nrv = 10, # Number of random vectors used to estimate fermionic correlation functions.
     tol = 1e-10, # CG iterations tolerance.
     maxiter = 10_000, # Maximum number of CG iterations.
@@ -164,7 +164,7 @@ function run_simulation(
         ## Add the third nearest-neighbor bond in a honeycomb lattice to the model.
         bond_3_id = add_bond!(model_geometry, bond_3)
 
-        ## Set neartest-neighbor hopping amplitude to unity,
+        ## Set nearest-neighbor hopping amplitude to unity,
         ## setting the energy scale in the model.
         t = 1.0
 
@@ -285,7 +285,7 @@ function run_simulation(
             complex_sign_problem = false
         )
 
-# ## Initialize meuasurements
+# ## Initialize measurements
 # No changes need to made to this section of the code from the previous
 # [2c) Honeycomb Holstein Model with Checkpointing](@ref) tutorial.
 
@@ -454,7 +454,7 @@ function run_simulation(
 # No changes need to made to this section of the code from the previous
 # [2c) Honeycomb Holstein Model with Checkpointing](@ref) tutorial.
 
-    ## Initialize Hamitlonian/Hybrid monte carlo (HMC) updater.
+    ## Initialize Hamiltonian/Hybrid monte carlo (HMC) updater.
     hmc_updater = EFAPFFHMCUpdater(
         electron_phonon_parameters = electron_phonon_parameters,
         Nt = Nt, Δt = π/(2*Nt)

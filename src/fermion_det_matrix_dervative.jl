@@ -29,7 +29,7 @@ function mul_νRe∂M∂x!(
     # v′[l] = -v′[l] = -v[l-1] for l>1
     @views @. v′[2:end,:] = -v′[2:end,:]
 
-    # caluculate v′[l] = exp(-Δτ⋅K[l]/2)ᵀ⋅v[l-1]
+    # calculate v′[l] = exp(-Δτ⋅K[l]/2)ᵀ⋅v[l-1]
     checkerboard_lmul!(v′, checkerboard_neighbor_table, coshΔτt, sinhΔτt, transposed = true)
 
     # calculate v′[l] = exp(-Δτ⋅V[l])⋅exp(-Δτ⋅K[l]/2)ᵀ⋅v[l-1]
@@ -144,7 +144,7 @@ function mul_νRe∂M∂x!(
     # v′[l] = -v′[l] = -v[l-1] for l>1
     @views @. v′[2:end,:] = -v′[2:end,:]
 
-    # caluculate v′[l] = exp(-Δτ⋅K[l])⋅v[l-1]
+    # calculate v′[l] = exp(-Δτ⋅K[l])⋅v[l-1]
     checkerboard_lmul!(v′, checkerboard_neighbor_table, coshΔτt, sinhΔτt, transposed = false)
 
     # calculate v′[l] = B[l]⋅v[l-1] = exp(-Δτ⋅V[l])⋅exp(-Δτ⋅K[l])⋅v[l-1]

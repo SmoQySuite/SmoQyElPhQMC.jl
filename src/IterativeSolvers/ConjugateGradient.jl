@@ -126,7 +126,7 @@ function cg_solve!(
     # r₀⋅r₀
     rdotr = dot(r,r)
 
-    # calcualte initial tolerance
+    # calculate initial tolerance
     ϵ = norm(r)/normb
 
     # check if linear system is already solved
@@ -205,7 +205,7 @@ function cg_solve!(
     # r₀⋅z₀
     rdotz = dot(r,z)
 
-    # calcualte initial tolerance
+    # calculate initial tolerance
     ϵ = norm(r)/normb
 
     # check if linear system is already solved

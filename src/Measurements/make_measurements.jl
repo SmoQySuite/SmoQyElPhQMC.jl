@@ -861,7 +861,7 @@ function copyto_correlation_container!(
     return nothing
 end
 
-# record the composite correlatin measurement stored in tmp to appropriate containers,
+# record the composite correlation measurement stored in tmp to appropriate containers,
 # including calculating the fourier transform to get the correspond structure factor
 function copyto_composite_correlation_container!(
     equaltime_composite_correlations::Dict{String, CompositeCorrelationContainer{D,D,T}},

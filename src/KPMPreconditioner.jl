@@ -62,9 +62,9 @@ mutable struct SymKPMPreconditioner{T, E, Tfft, Tifft} <: KPMPreconditioner{T, E
 
     # whether preconditioner is active or not
     active::Bool
-    # relative buffer applied to eigevalue bounds calculated by Lanczos
+    # relative buffer applied to eigenvalue bounds calculated by Lanczos
     rbuf::E
-    # number of lanczos iterations used to approximate eigenvalue bounds
+    # number of Lanczos iterations used to approximate eigenvalue bounds
     n::Int
     # controls maximum order of kpm expansion
     a1::E
@@ -90,9 +90,9 @@ mutable struct SymKPMPreconditioner{T, E, Tfft, Tifft} <: KPMPreconditioner{T, E
     α_lanczos::Vector{E}
     # vectors for performing Lanczos
     β_lanczos::Vector{E}
-    # temporar storage for Lanczos
+    # temporary storage for Lanczos
     tmp_lanczos::Matrix{T}
-    # temprorary storage vectors for ldiv!
+    # temporary storage vectors for ldiv!
     v::Matrix{Complex{E}}
     # temporary storage vectors for ldiv!
     v′::Matrix{Complex{E}}
@@ -133,9 +133,9 @@ mutable struct AsymKPMPreconditioner{T, E, Tfft, Tifft} <: KPMPreconditioner{T, 
 
     # whether preconditioner is active or not
     active::Bool
-    # relative buffer applied to eigevalue bounds calculated by Lanczos
+    # relative buffer applied to eigenvalue bounds calculated by Lanczos
     rbuf::E
-    # number of lanczos iterations used to approximate eigenvalue bounds
+    # number of Lanczos iterations used to approximate eigenvalue bounds
     n::Int
     # controls maximum order of kpm expansion
     a1::E
@@ -147,7 +147,7 @@ mutable struct AsymKPMPreconditioner{T, E, Tfft, Tifft} <: KPMPreconditioner{T, 
     U::FourierTransformer{E, Tfft, Tifft}
     # phase associated with each frequency
     ϕs::Vector{E}
-    # eivenvalue bounds of B̄
+    # eigenvalue bounds of B̄
     bounds::Tuple{E, E}
     # order of KPM expansion for each frequency
     order::Vector{Int}
@@ -161,9 +161,9 @@ mutable struct AsymKPMPreconditioner{T, E, Tfft, Tifft} <: KPMPreconditioner{T, 
     α_lanczos::Vector{E}
     # vectors for performing Lanczos
     β_lanczos::Vector{E}
-    # temporar storage for Lanczos
+    # temporary storage for Lanczos
     tmp_lanczos::Matrix{T}
-    # temprorary storage vectors for ldiv!
+    # temporary storage vectors for ldiv!
     v::Matrix{Complex{E}}
     # temporary storage vectors for ldiv!
     v′::Matrix{Complex{E}}
@@ -190,8 +190,8 @@ Initialize and return an instance of either the [`SymKPMPreconditioner`](@ref) o
 # Keyword Arguments
 
 - `rng::AbstractRNG = Random.default_rng()`: Random number generator.
-- `rbuf::E = 0.10`: Relative buffer applied to eigevalue bounds of ``\bar{B}`` calculated by Lanczos.
-- `n::Int = 20`: Number of lanczos iterations used to approximate eigenvalue bounds.
+- `rbuf::E = 0.10`: Relative buffer applied to eigenvalue bounds of ``\bar{B}`` calculated by Lanczos.
+- `n::Int = 20`: Number of Lanczos iterations used to approximate eigenvalue bounds.
 - `a1::E = 1.0`: Controls maximum order of kpm expansion.
 - `a2::E = 1.0`: Controls minimum order of kpm expansion.
 """
@@ -250,7 +250,7 @@ function KPMPreconditioner(
         # get half the frequencies
         Lτo2 = cld(Lτ, 2)
 
-        # initialize order of KPM expansion for each frquency
+        # initialize order of KPM expansion for each frequency
         order = zeros(Int, Lτo2)
 
         # initialize vector of vector to contain coefficients
@@ -264,7 +264,7 @@ function KPMPreconditioner(
 
     else
 
-        # initialize order of KPM expansion for each frquency
+        # initialize order of KPM expansion for each frequency
         order = zeros(Int, Lτ)
 
         # initialize vector of vector to contain coefficients
@@ -310,7 +310,7 @@ function ldiv!(
         # v′[r,ω] = v[ω,r]
         transpose!(v′, v)
 
-        # iterate over frequncies
+        # iterate over frequencies
         for n in 1:Lτo2
 
             # get relevant vector
@@ -562,14 +562,14 @@ function update_preconditioner!(
     # update B̄ propagator matrix
     update_B̄!(B̄, fermion_det_matrix)
 
-    # calculate eigenbounds
+    # calculate eigenvalue bounds
     ϵ_min_new, ϵ_max_new = calculate_bounds!(Pkpm, rng)
 
-    # adjust eigenbounds using buffer
+    # adjust eigenvalue bounds using buffer
     ϵ_min_new = (1-rbuf)*ϵ_min_new
     ϵ_max_new = (1+rbuf)*ϵ_max_new
 
-    # check if reasonable eigenbounds were found
+    # check if reasonable eigenvalue bounds were found
     if (0.0 < ϵ_min_new < 1.0) && (1.0 < ϵ_max_new < 2.0)
 
         # activate the preconditioner
@@ -579,7 +579,7 @@ function update_preconditioner!(
         ϵ_min, ϵ_max = Pkpm.bounds
 
         # check if current bounds are no longer accurate to within the buffer tolerance
-        if !isapprox(ϵ_min, ϵ_min_new, rtol = rbuf/2) || !isapprox(ϵ_max, ϵ_max_new, rtol = rbuf/2)
+        if (abs((ϵ_min_new-ϵ_min)/ϵ_min) > rbuf/2) || (abs((ϵ_max_new-ϵ_max)/ϵ_max) > rbuf/2)
 
             # update bounds
             Pkpm.bounds = (ϵ_min_new, ϵ_max_new)
@@ -710,7 +710,7 @@ function update_kpm_expansion_order!(
         ϕ = ϕ > π ? 2π - ϕ : ϕ
         n = max(1, floor(Int, (ϵ_max - ϵ_min)*(a1/ϕ + a2)))
 
-        # check if expansion or changed
+        # check if expansion order changed
         if n ≠ order[l]
 
             # record new expansion order

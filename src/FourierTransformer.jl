@@ -22,7 +22,7 @@ end
 
 FourierTransformer(v::Matrix{T}) where {T<:Number} = FourierTransformer(real(T), size(v)...)
 
-# evalute u = U⋅v, τ → ω
+# evaluate u = U⋅v, τ → ω
 function mul!(
     u::AbstractVecOrMat{Complex{T}},
     U::FourierTransformer{T},

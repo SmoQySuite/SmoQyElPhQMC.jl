@@ -90,7 +90,7 @@ function calculate_fermionic_action!(
     Ψ = u
     MᵀM = fermion_det_matrix
 
-    # udpate Λ
+    # update Λ
     update_Λ!(Λ, electron_phonon_parameters)
     # Ψ = Λ⁻ᵀ⋅Φ
     ldiv_Λᵀ!(Ψ, Λ, Φ)
@@ -113,7 +113,7 @@ function calculate_fermionic_action!(
     return Sf, iters, ϵ
 end
 
-# calcualte the derivative of the fermionic action for a single spin species
+# calculate the derivative of the fermionic action for a single spin species
 function calculate_derivative_fermionic_action!(
     ∂Sf∂x::AbstractMatrix{E},
     pff_calculator::PFFCalculator{E},

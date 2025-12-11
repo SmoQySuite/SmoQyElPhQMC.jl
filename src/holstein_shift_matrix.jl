@@ -43,7 +43,7 @@ function update_Λ!(
     return nothing
 end
 
-# evalute |u′⟩ = Λ|u⟩
+# evaluate |u′⟩ = Λ|u⟩
 function mul_Λ!(
     u′::AbstractVecOrMat{T},
     Λ::AbstractMatrix{E},
@@ -98,7 +98,7 @@ function ldiv_Λ!(
 end
 
 
-# evalute |u′⟩ = Λᵀ|u⟩
+# evaluate |u′⟩ = Λᵀ|u⟩
 function mul_Λᵀ!(
     u′::AbstractVecOrMat{T},
     Λ::AbstractMatrix{E},

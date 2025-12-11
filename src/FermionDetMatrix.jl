@@ -204,7 +204,7 @@ function AsymFermionDetMatrix(
 end
 
 
-# udpate fermion determinant matrix to reflect fermion path integral
+# update fermion determinant matrix to reflect fermion path integral
 function update!(
     fermion_det_matrix::FermionDetMatrix{T, E},
     fermion_path_integral::FermionPathIntegral{T, E}

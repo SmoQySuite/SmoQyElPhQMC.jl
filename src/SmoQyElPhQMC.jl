@@ -78,7 +78,7 @@ export KPMPreconditioner, SymKPMPreconditioner, AsymKPMPreconditioner
 include("PFFCalculator.jl")
 export PFFCalculator
 
-# For performing HMC udpates to phonon fields that use exact fourier acceleration (EFA)
+# For performing HMC updates to phonon fields that use exact fourier acceleration (EFA)
 # to improve sampling
 import SmoQyDQMC: hmc_update!
 include("EFAPFFHMCUpdater.jl")
