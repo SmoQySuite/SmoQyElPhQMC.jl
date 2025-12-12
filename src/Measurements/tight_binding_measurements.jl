@@ -48,12 +48,6 @@ function make_tight_binding_measurements!(
             local_measurements["hopping_inversion_up"][hopping_id] += tbar
             local_measurements["hopping_inversion_dn"][hopping_id] += tbar
             local_measurements["hopping_inversion"][hopping_id] += tbar
-
-            # measure hopping inversion
-            tbar = measure_hopping_inversion_avg(tight_binding_parameters, fermion_path_integral, hopping_id)
-            local_measurements["hopping_inversion_avg_up"][hopping_id] += tbar
-            local_measurements["hopping_inversion_avg_dn"][hopping_id] += tbar
-            local_measurements["hopping_inversion_avg"][hopping_id] += tbar
         end
     end
 
