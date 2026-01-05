@@ -8,7 +8,10 @@ using Statistics
 using ShiftedArrays
 using CircularArrays
 using StaticArrays
+using PkgVersion
 
+# get and set package version number as global constant
+const SMOQYELPHQMC_VERSION = PkgVersion.@Version 0
 
 # Reshapes with zero allocations, returns an instance of Base.ReshapedArray.
 # Discussion found at: https://github.com/JuliaLang/julia/issues/36313

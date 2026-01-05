@@ -377,7 +377,7 @@ function ldiv!(
         # v′[r,ω] = v[ω,r]
         transpose!(v′, v)
 
-        # iterate over frequncies
+        # iterate over frequencies
         for n in 1:Lτ
 
             # get relevant vector
@@ -439,7 +439,7 @@ function ldiv!(
         # v′[r,ω] = v[ω,r]
         transpose!(v′, v)
 
-        # iterate over frequncies
+        # iterate over frequencies
         for n in 1:Lτo2
 
             # get relevant vector
@@ -510,7 +510,7 @@ function ldiv!(
         # v′[r,ω] = v[ω,r]
         transpose!(v′, v)
 
-        # iterate over frequncies
+        # iterate over frequencies
         for n in 1:Lτ
 
             # get relevant vector
