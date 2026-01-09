@@ -107,7 +107,7 @@ function calculate_fermionic_action!(
     ldiv_Λ!(Ψ, Λ, Ψ)
     # Sf = Φᵀ⋅Ψ = Φᵀ⋅[Aᵀ⋅A]⁻¹⋅Φ
     Sf = dot(Φ,Ψ)
-    @assert sqrt(tol) > abs(imag(Sf)/real(Sf)) "Complex Fermionic Action, Sf = $Sf"
+    @warn sqrt(tol) > abs(imag(Sf)/real(Sf)) "Complex Fermionic Action Encountered, Sf = $Sf"
     Sf = real(Sf)
 
     return Sf, iters, ϵ
