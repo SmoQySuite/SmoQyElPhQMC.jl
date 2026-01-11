@@ -27,7 +27,7 @@
 # [SmoQyDQMC](https://github.com/SmoQySuite/SmoQyDQMC.jl.git), enabling the simulation of strictly spin-symmetric electron-phonon models.
 # Therefore, in addition to importing [SmoQyElPhQMC](https://github.com/SmoQySuite/SmoQyElPhQMC.jl.git),
 # we also need to import [SmoQyDQMC](https://github.com/SmoQySuite/SmoQyDQMC.jl.git).
-# The [SmoQyDQMC](https://github.com/SmoQySuite/SmoQyDQMC.jl.git) package also then rexports 
+# The [SmoQyDQMC](https://github.com/SmoQySuite/SmoQyDQMC.jl.git) package also then reexports 
 # the [LatticeUtilities](https://github.com/SmoQySuite/LatticeUtilities.jl.git) package,
 # which we will use to define the lattice geometry for our model.
 
@@ -286,8 +286,8 @@ function run_simulation(;
 # types are agnostic to the size of the lattice being simulated,
 # defining the model in a translationally invariant way. As [SmoQyDQMC](https://github.com/SmoQySuite/SmoQyDQMC.jl.git) and
 # [SmoQyElPhQMC](https://github.com/SmoQySuite/SmoQyElPhQMC.jl.git) supports
-# random disorder in the terms appearing in the Hamiltonian, it is necessary to initialize seperate parameter values for each unit cell in the lattice.
-# For instance, we need to initialize a seperate number to represent the on-site energy for each orbital in our finite lattice.
+# random disorder in the terms appearing in the Hamiltonian, it is necessary to initialize separate parameter values for each unit cell in the lattice.
+# For instance, we need to initialize a separate number to represent the on-site energy for each orbital in our finite lattice.
 
     ## Initialize tight-binding parameters.
     tight_binding_parameters = TightBindingParameters(
@@ -383,7 +383,7 @@ function run_simulation(;
 # It is also useful to initialize more specialized composite correlation function measurements.
 
 # First, it can be useful to measure the time-displaced single-particle electron Green's function traced over both orbitals in the unit cell.
-# We can easily implement this measurement using the [`initialize_composite_correlation_measurement!`](@ref) function, as shown below.
+# We can easily implement this measurement using the [`SmoQyDQMC.initialize_composite_correlation_measurement!`](@extref) function, as shown below.
 
     ## Initialize measurement of electron Green's function traced
     ## over both orbitals in the unit cell.
@@ -409,7 +409,7 @@ function run_simulation(;
 # and ``\hat{n}_{\mathbf{i},\gamma} = (\hat{n}_{\uparrow,\mathbf{i},o} + \hat{n}_{\downarrow,\mathbf{i},o})`` is the total electron number
 # operator for orbital ``\gamma \in \{A,B\}`` in unit cell ``\mathbf{i}``.
 # It is then also useful to calculate the corresponding structure factor ``S_\text{cdw}(\mathbf{q},\tau)`` and susceptibility ``\chi_\text{cdw}(\mathbf{q}).``
-# Again, this can all be easily calculated using the [`initialize_composite_correlation_measurement!`](@ref) function, as shown below.
+# Again, this can all be easily calculated using the [`SmoQyDQMC.initialize_composite_correlation_measurement!`](@extref) function, as shown below.
 
     ## Initialize CDW correlation measurement.
     initialize_composite_correlation_measurement!(
@@ -465,7 +465,7 @@ function run_simulation(;
 # [`SmoQyDQMC.FermionPathIntegral`](@extref) to reflect the contribution from the initial phonon field configuration.
 
 # Next we initialize an instance of the [`SymFermionDetMatrix`](@ref) type of represent the Fermion determinant matrix,
-# where is an inherited type from the abstracy [`FermionDetMatrix`](@ref) type.
+# where is an inherited type from the abstract [`FermionDetMatrix`](@ref) type.
 # We could have used an instance of the [`AsymFermionDetMatrix`](@ref) here instead if we wanted to.
 
     ## Initialize fermion determinant matrix. Also set the default tolerance and max iteration count
@@ -482,7 +482,7 @@ function run_simulation(;
 # S_F(x,\Phi) = \Phi^\dagger \left[\Lambda^\dagger(x) M^\dagger(x) M^{\phantom\dagger}(x) \Lambda^{\phantom\dagger}(x)\right]^{-1} \Phi^{\phantom\dagger};
 # ```
 # where ``M(x)`` is the fermion determinant matrix and ``\Lambda(x)`` is a unitary transformation specially chosen to improve sampling.
-# These auxialary fields result from replacing the fermion determinants by a complex multivariate Gaussian integral
+# These auxiliary fields result from replacing the fermion determinants by a complex multivariate Gaussian integral
 # ```math
 # |\det M(x)|^2 \propto \int d\Phi e^{-S_F(x,\Phi)}.
 # ```
@@ -680,9 +680,9 @@ function run_simulation(;
 
 # ## Merge binned data
 # At this point the simulation is essentially complete, with all updates and measurements having been performed.
-# However, the binned measurement data resides in many seperate HDF5 files currently.
-# Here we will merge these seperate HDF5 files into a single file containing all the binned data
-# using the [`merge_bins`](@extref) function.
+# However, the binned measurement data resides in many separate HDF5 files currently.
+# Here we will merge these separate HDF5 files into a single file containing all the binned data
+# using the [`SmoQyDQMC.merge_bins`](@extref) function.
 
     ## Merge binned data into a single HDF5 file.
     merge_bins(simulation_info)
@@ -710,13 +710,14 @@ function run_simulation(;
 # ## Post-process results
 # In this final section of code we post-process the binned data.
 # This includes calculating the final estimates for the mean and error of all measured observables,
-# which will be written to an HDF5 file using the [`process_measurements`](@ref) function.
-# Inside this function the binned data gets further rebinned into `n_bins`,
+# which will be written to an HDF5 file using the [`SmoQyDQMC.process_measurements`](@extref) function.
+# Inside this function the binned data gets further re-binned into `n_bins`,
 # where `n_bins` is any positive integer satisfying the constraints `(N_bins ≥ n_bin)` and `(N_bins % n_bins == 0)`.
-# Note that the [`process_measurements`](@ref) function has many additional keyword arguments that can be used to control the output.
+# Note that the [`SmoQyDQMC.process_measurements`](@extref) function has many additional keyword arguments that can be used to control the output.
 # For instance, in this example in addition to writing the statistics to an HDF5 file, we also export the statistics to CSV files
 # by setting `export_to_csv = true`, with additional keyword arguments controlling the formatting of the CSV files.
-# Again, for more information on how to interpret the output refer the [Simulation Output Overview](@ref) page.
+# Again, for more information on how to interpret the output refer the
+# [Simulation Output Overview](https://smoqysuite.github.io/SmoQyDQMC.jl/stable/simulation_output/) page.
 
     ## Process the simulation results, calculating final error bars for all measurements.
     ## writing final statistics to CSV files.
@@ -741,10 +742,12 @@ function run_simulation(;
 # localizing on one of the two sub-lattices of the honeycomb lattice.
 # The sum over ``\delta\mathbf{q}`` runs over the four wave-vectors that neighbor ``\mathbf{Q}_\text{cdw} = 0.``
 
-# Here we use the [`compute_composite_correlation_ratio`](@ref) function to compute to compute this correlation ratio.
+# Here we use the [`SmoQyDQMC.compute_composite_correlation_ratio`](@extref) function to compute to compute this correlation ratio.
 # Note that the ``\mathbf{Q}_\text{cdw} = 0`` is specified using the `q_point` keyword argument, and the four neighboring wave-vectors
 # ``\delta\mathbf{q}`` are specified using the `q_neighbors` keyword argument.
-# These wave-vectors are specified using the convention described [here](@ref vector_reporting_conventions) in the [Simulation Output Overview](@ref) page.
+# These wave-vectors are specified using the convention described
+# [here](https://smoqysuite.github.io/SmoQyDQMC.jl/stable/simulation_output/#vector_reporting_conventions) in the
+# [Simulation Output Overview](https://smoqysuite.github.io/SmoQyDQMC.jl/stable/simulation_output/) page.
 # Note that because the honeycomb lattice has a ``C_6`` rotation symmetry, each wave-vector in momentum-space has six nearest-neighbor wave-vectors.
 # Below we specify all six wave-vectors that neighbor the ``\mathbf{Q}_\text{cdw} = 0`` wave-vector ordering wave-vector, accounting for the fact
 # that the Brillouin zone is periodic in the reciprocal lattice vectors.
@@ -762,7 +765,7 @@ function run_simulation(;
     )
 
 # Next, we record the measurement in the `metadata` dictionary, and then write a new version of the simulation summary TOML file that
-# contains this new information using the [`save_simulation_info`](@ref) function.
+# contains this new information using the [`SmoQyDQMC.save_simulation_info`](@extref) function.
 
     ## Record the AFM correlation ratio mean and standard deviation.
     metadata["Rcdw_mean_real"] = real(Rcdw)
@@ -772,7 +775,7 @@ function run_simulation(;
     ## Write simulation summary TOML file.
     save_simulation_info(simulation_info, metadata)
 
-# Note that as long as the binned data persists the [`process_measurements`](@ref) and [`compute_correlation_ratio`](@ref)
+# Note that as long as the binned data persists the [`SmoQyDQMC.process_measurements`](@extref) and [`SmoQyDQMC.compute_correlation_ratio`](@extref)
 # functions can be rerun to recompute the final statistics for the measurements without needing to rerun the simulation.
 
     return nothing
