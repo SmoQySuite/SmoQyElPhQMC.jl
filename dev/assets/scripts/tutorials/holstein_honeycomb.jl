@@ -1,8 +1,8 @@
 using SmoQyElPhQMC
-
 using SmoQyDQMC
 import SmoQyDQMC.LatticeUtilities as lu
 
+using LinearAlgebra
 using Random
 using Printf
 
@@ -19,10 +19,11 @@ function run_simulation(;
     N_updates, # Total number of measurements and measurement updates.
     N_bins, # Number of times bin-averaged measurements are written to file.
     Δτ = 0.05, # Discretization in imaginary time.
-    Nt = 100, # Numer of time-steps in HMC update.
+    Nt = 25, # Number of time-steps in HMC update.
     Nrv = 10, # Number of random vectors used to estimate fermionic correlation functions.
     tol = 1e-10, # CG iterations tolerance.
-    maxiter = 1000, # Maximum number of CG iterations.
+    maxiter = 10_000, # Maximum number of CG iterations.
+    write_bins_concurrent = true, # Whether to write HDF5 bins during the simulation.
     seed = abs(rand(Int)), # Seed for random number generator.
     filepath = "." # Filepath to where data folder will be created.
 )
@@ -34,6 +35,7 @@ function run_simulation(;
     simulation_info = SimulationInfo(
         filepath = filepath,
         datafolder_prefix = datafolder_prefix,
+        write_bins_concurrent = write_bins_concurrent,
         sID = sID
     )
 
@@ -43,34 +45,40 @@ function run_simulation(;
     # Initialize random number generator
     rng = Xoshiro(seed)
 
-    # Initialize additiona_info dictionary
+    # Initialize metadata dictionary
     metadata = Dict()
 
     # Record simulation parameters.
-    metadata["N_therm"]   = N_therm    # Number of thermalization updates
+    metadata["N_therm"] = N_therm  # Number of thermalization updates
     metadata["N_updates"] = N_updates  # Total number of measurements and measurement updates
-    metadata["N_bins"]    = N_bins     # Number of times bin-averaged measurements are written to file
-    metadata["maxiter"]   = maxiter    # Maximum number of conjugate gradient iterations
-    metadata["tol"]       = tol        # Tolerance used for conjugate gradient solves
-    metadata["Nt"]        = Nt         # Number of time-steps in HMC update
-    metadata["Nrv"]       = Nrv        # Number of random vectors used to estimate fermionic correlation functions
-    metadata["seed"]      = seed       # Random seed used to initialize random number generator in simulation
+    metadata["N_bins"] = N_bins # Number of times bin-averaged measurements are written to file
+    metadata["maxiter"] = maxiter # Maximum number of conjugate gradient iterations
+    metadata["tol"] = tol # Tolerance used for conjugate gradient solves
+    metadata["Nt"] = Nt # Number of time-steps in HMC update
+    metadata["Nrv"] = Nrv # Number of random vectors used to estimate fermionic correlation functions
+    metadata["seed"] = seed  # Random seed used to initialize random number generator in simulation
 
-    metadata["hmc_acceptance_rate"] = 0.0
-    metadata["reflection_acceptance_rate"] = 0.0
-    metadata["swap_acceptance_rate"] = 0.0
+    metadata["hmc_acceptance_rate"] = 0.0 # HMC acceptance rate
+    metadata["reflection_acceptance_rate"] = 0.0 # Reflection update acceptance rate
+    metadata["swap_acceptance_rate"] = 0.0 # Swap update acceptance rate
 
-    metadata["hmc_iters"] = 0.0
-    metadata["reflection_iters"] = 0.0
-    metadata["swap_iters"] = 0.0
-    metadata["measurement_iters"] = 0.0
+    metadata["hmc_iters"] = 0.0 # Avg number of CG iterations per solve in HMC update.
+    metadata["reflection_iters"] = 0.0 # Avg number of CG iterations per solve in reflection update.
+    metadata["swap_iters"] = 0.0 # Avg number of CG iterations per solve in swap update.
+    metadata["measurement_iters"] = 0.0 # Avg number of CG iterations per solve while making measurements.
+
+    # Define lattice vectors.
+    a1 = [+3/2, +√3/2]
+    a2 = [+3/2, -√3/2]
+
+    # Define basis vectors for two orbitals in the honeycomb unit cell.
+    r1 = [0.0, 0.0] # Location of first orbital in unit cell.
+    r2 = [1.0, 0.0] # Location of second orbital in unit cell.
 
     # Define the unit cell.
     unit_cell = lu.UnitCell(
-        lattice_vecs = [[3/2,√3/2],
-                        [3/2,-√3/2]],
-        basis_vecs   = [[0.,0.],
-                        [1.,0.]]
+        lattice_vecs = [a1, a2],
+        basis_vecs   = [r1, r2]
     )
 
     # Define finite lattice with periodic boundary conditions.
@@ -100,7 +108,7 @@ function run_simulation(;
     # Add the third nearest-neighbor bond in a honeycomb lattice to the model.
     bond_3_id = add_bond!(model_geometry, bond_3)
 
-    # Set neartest-neighbor hopping amplitude to unity,
+    # Set nearest-neighbor hopping amplitude to unity,
     # setting the energy scale in the model.
     t = 1.0
 
@@ -120,7 +128,10 @@ function run_simulation(;
     )
 
     # Define a dispersionless electron-phonon mode to live on each site in the lattice.
-    phonon_1 = PhononMode(orbital = 1, Ω_mean = Ω)
+    phonon_1 = PhononMode(
+        basis_vec = r1,
+        Ω_mean = Ω
+    )
 
     # Add the phonon mode definition to the electron-phonon model.
     phonon_1_id = add_phonon_mode!(
@@ -128,8 +139,11 @@ function run_simulation(;
         phonon_mode = phonon_1
     )
 
-    # Define a dispersionless electron-phonon mode to live on each site in the lattice.
-    phonon_2 = PhononMode(orbital = 2, Ω_mean = Ω)
+    # Define a dispersionless electron-phonon mode to live on the second sublattice.
+    phonon_2 = PhononMode(
+        basis_vec = r2,
+        Ω_mean = Ω
+    )
 
     # Add the phonon mode definition to the electron-phonon model.
     phonon_2_id = add_phonon_mode!(
@@ -140,10 +154,11 @@ function run_simulation(;
     # Define first local Holstein coupling for first phonon mode.
     holstein_coupling_1 = HolsteinCoupling(
         model_geometry = model_geometry,
-        phonon_mode = phonon_1_id,
-        # Couple the first phonon mode to first orbital in the unit cell.
-        bond = lu.Bond(orbitals = (1,1), displacement = [0, 0]),
-        α_mean = α
+        phonon_id = phonon_1_id,
+        orbital_id = 1,
+        displacement = [0, 0],
+        α_mean = α,
+        ph_sym_form = true,
     )
 
     # Add the first local Holstein coupling definition to the model.
@@ -153,16 +168,17 @@ function run_simulation(;
         model_geometry = model_geometry
     )
 
-    # Define first local Holstein coupling for first phonon mode.
+    # Define second local Holstein coupling for second phonon mode.
     holstein_coupling_2 = HolsteinCoupling(
         model_geometry = model_geometry,
-        phonon_mode = phonon_2_id,
-        # Couple the second phonon mode to second orbital in the unit cell.
-        bond = lu.Bond(orbitals = (2,2), displacement = [0, 0]),
-        α_mean = α
+        phonon_id = phonon_2_id,
+        orbital_id = 2,
+        displacement = [0, 0],
+        α_mean = α,
+        ph_sym_form = true,
     )
 
-    # Add the first local Holstein coupling definition to the model.
+    # Add the second local Holstein coupling definition to the model.
     holstein_coupling_2_id = add_holstein_coupling!(
         electron_phonon_model = electron_phonon_model,
         holstein_coupling = holstein_coupling_2,
@@ -265,6 +281,18 @@ function run_simulation(;
         ]
     )
 
+    # Initialize measurement of electron Green's function traced
+    # over both orbitals in the unit cell.
+    initialize_composite_correlation_measurement!(
+        measurement_container = measurement_container,
+        model_geometry = model_geometry,
+        name = "tr_greens",
+        correlation = "greens",
+        id_pairs = [(1,1), (2,2)],
+        coefficients = [1.0, 1.0],
+        time_displaced = true,
+    )
+
     # Initialize CDW correlation measurement.
     initialize_composite_correlation_measurement!(
         measurement_container = measurement_container,
@@ -273,12 +301,10 @@ function run_simulation(;
         correlation = "density",
         ids = [1, 2],
         coefficients = [1.0, -1.0],
+        displacement_vecs = [[0.0, 0.0], [0.0, 0.0]],
         time_displaced = false,
         integrated = true
     )
-
-    # Initialize the sub-directories to which the various measurements will be written.
-    initialize_measurement_directories(simulation_info, measurement_container)
 
     # Allocate a single FermionPathIntegral for both spin-up and down electrons.
     fermion_path_integral = FermionPathIntegral(tight_binding_parameters = tight_binding_parameters, β = β, Δτ = Δτ)
@@ -288,7 +314,7 @@ function run_simulation(;
 
     # Initialize fermion determinant matrix. Also set the default tolerance and max iteration count
     # used in conjugate gradient (CG) solves of linear systems involving this matrix.
-    fermion_det_matrix = AsymFermionDetMatrix(
+    fermion_det_matrix = SymFermionDetMatrix(
         fermion_path_integral,
         maxiter = maxiter, tol = tol
     )
@@ -297,22 +323,15 @@ function run_simulation(;
     pff_calculator = PFFCalculator(electron_phonon_parameters, fermion_det_matrix)
 
     # Initialize KPM preconditioner.
-    kpm_preconditioner = KPMPreconditioner(fermion_det_matrix, rng = rng)
+    preconditioner = KPMPreconditioner(fermion_det_matrix, rng = rng)
 
     # Initialize Green's function estimator for making measurements.
     greens_estimator = GreensEstimator(fermion_det_matrix, model_geometry)
 
-    # Integrated trajectory time; one quarter the period of the bare phonon mode.
-    Tt = π/(2Ω)
-
-    # Fermionic time-step used in HMC update.
-    Δt = Tt/Nt
-
+    # Initialize Hamiltonian/Hybrid monte carlo (HMC) updater.
     hmc_updater = EFAPFFHMCUpdater(
         electron_phonon_parameters = electron_phonon_parameters,
-        Nt = Nt, Δt = Δt,
-        η = 0.0, # Regularization parameter for exact fourier acceleration (EFA)
-        δ = 0.05 # Fractional max amplitude of noise added to time-step Δt before each HMC update.
+        Nt = Nt, Δt = π/(2*Nt)
     )
 
     # Iterate over number of thermalization updates to perform.
@@ -323,7 +342,7 @@ function run_simulation(;
             electron_phonon_parameters, pff_calculator,
             fermion_path_integral = fermion_path_integral,
             fermion_det_matrix = fermion_det_matrix,
-            preconditioner = kpm_preconditioner,
+            preconditioner = preconditioner,
             rng = rng, tol = tol, maxiter = maxiter
         )
 
@@ -338,7 +357,7 @@ function run_simulation(;
             electron_phonon_parameters, pff_calculator,
             fermion_path_integral = fermion_path_integral,
             fermion_det_matrix = fermion_det_matrix,
-            preconditioner = kpm_preconditioner,
+            preconditioner = preconditioner,
             rng = rng, tol = tol, maxiter = maxiter
         )
 
@@ -354,7 +373,7 @@ function run_simulation(;
             fermion_path_integral = fermion_path_integral,
             fermion_det_matrix = fermion_det_matrix,
             pff_calculator = pff_calculator,
-            preconditioner = kpm_preconditioner,
+            preconditioner = preconditioner,
             tol_action = tol, tol_force = sqrt(tol), maxiter = maxiter,
             rng = rng,
         )
@@ -377,7 +396,7 @@ function run_simulation(;
             electron_phonon_parameters, pff_calculator,
             fermion_path_integral = fermion_path_integral,
             fermion_det_matrix = fermion_det_matrix,
-            preconditioner = kpm_preconditioner,
+            preconditioner = preconditioner,
             rng = rng, tol = tol, maxiter = maxiter
         )
 
@@ -392,7 +411,7 @@ function run_simulation(;
             electron_phonon_parameters, pff_calculator,
             fermion_path_integral = fermion_path_integral,
             fermion_det_matrix = fermion_det_matrix,
-            preconditioner = kpm_preconditioner,
+            preconditioner = preconditioner,
             rng = rng, tol = tol, maxiter = maxiter
         )
 
@@ -408,7 +427,7 @@ function run_simulation(;
             fermion_path_integral = fermion_path_integral,
             fermion_det_matrix = fermion_det_matrix,
             pff_calculator = pff_calculator,
-            preconditioner = kpm_preconditioner,
+            preconditioner = preconditioner,
             tol_action = tol, tol_force = sqrt(tol), maxiter = maxiter,
             rng = rng,
         )
@@ -426,7 +445,7 @@ function run_simulation(;
             fermion_path_integral = fermion_path_integral,
             tight_binding_parameters = tight_binding_parameters,
             electron_phonon_parameters = electron_phonon_parameters,
-            preconditioner = kpm_preconditioner,
+            preconditioner = preconditioner,
             tol = tol, maxiter = maxiter,
             rng = rng
         )
@@ -434,20 +453,19 @@ function run_simulation(;
         # Record the average number of iterations per CG solve for measurements.
         metadata["measurement_iters"] += iters
 
-        # Check if bin averaged measurements need to be written to file.
-        if update % bin_size == 0
-
-            # Write the bin-averaged measurements to file.
-            write_measurements!(
-                measurement_container = measurement_container,
-                simulation_info = simulation_info,
-                model_geometry = model_geometry,
-                bin = update ÷ bin_size,
-                bin_size = bin_size,
-                Δτ = Δτ
-            )
-        end
+        # Write the bin-averaged measurements to file if update ÷ bin_size == 0.
+        write_measurements!(
+            measurement_container = measurement_container,
+            simulation_info = simulation_info,
+            model_geometry = model_geometry,
+            measurement = update,
+            bin_size = bin_size,
+            Δτ = Δτ
+        )
     end
+
+    # Merge binned data into a single HDF5 file.
+    merge_bins(simulation_info)
 
     # Calculate acceptance rates.
     metadata["hmc_acceptance_rate"] /= (N_updates + N_therm)
@@ -463,17 +481,41 @@ function run_simulation(;
     # Write simulation metadata to simulation_info.toml file.
     save_simulation_info(simulation_info, metadata)
 
-    # Process the simulation results, calculating final error bars for all measurements,
-    # writing final statisitics to CSV files.
-    process_measurements(simulation_info.datafolder, N_bins, time_displaced = false)
+    # Process the simulation results, calculating final error bars for all measurements.
+    # writing final statistics to CSV files.
+    process_measurements(
+        datafolder = simulation_info.datafolder,
+        n_bins = N_bins,
+        export_to_csv = true,
+        scientific_notation = false,
+        decimals = 7,
+        delimiter = " "
+    )
 
-    # Merge binary files containing binned data into a single file.
-    compress_jld2_bins(folder = simulation_info.datafolder)
+    # Calculate CDW correlation ratio.
+    Rcdw, ΔRcdw = compute_composite_correlation_ratio(
+        datafolder = simulation_info.datafolder,
+        name = "cdw",
+        type = "equal-time",
+        q_point = (0, 0),
+        q_neighbors = [
+            (1,0),   (0,1),   (1,1),
+            (L-1,0), (0,L-1), (L-1,L-1)
+        ]
+    )
+
+    # Record the AFM correlation ratio mean and standard deviation.
+    metadata["Rcdw_mean_real"] = real(Rcdw)
+    metadata["Rcdw_mean_imag"] = imag(Rcdw)
+    metadata["Rcdw_std"]       = ΔRcdw
+
+    # Write simulation summary TOML file.
+    save_simulation_info(simulation_info, metadata)
 
     return nothing
 end # end of run_simulation function
 
-# Only excute if the script is run directly from the command line.
+# Only execute if the script is run directly from the command line.
 if abspath(PROGRAM_FILE) == @__FILE__
 
     # Run the simulation.
