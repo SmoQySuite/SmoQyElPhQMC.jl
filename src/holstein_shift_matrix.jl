@@ -5,38 +5,36 @@ function update_Λ!(
 ) where {T<:Number, E<:AbstractFloat}
 
     (; Δτ, x, holstein_parameters_up) = electron_phonon_parameters
-    (; Nholstein, nholstein, α, α3, coupling_to_phonon, neighbor_table, shifted) = holstein_parameters_up
+    (; Nholstein, nholstein, α, α3, coupling_to_phonon, coupling_to_site, ph_sym_form) = holstein_parameters_up
 
     # initialize assuming no holstein couplings
     @views @. Λ[1, :] = 1.0
     @views @. Λ[2:end, :] = -1.0
 
-    # if there are shifted holstein coupling
-    if any(shifted)
+    # if there are particle-hole symmetric form holstein couplings
+    if any(ph_sym_form)
         # Number of unit cells
         Nunitcells = Nholstein ÷ nholstein
         # iterate over types of holstein coupling
         for nhol in 1:nholstein
             # if holstein coupling is shiffted
-            if shifted[nhol]
+            if ph_sym_form[nhol]
                 # iterate over unit cells
                 for uc in 1:Nunitcells
                     # get the holstein coupling
                     coupling = (nhol-1) * Nunitcells + uc
                     # get phonon mode
                     phonon  = coupling_to_phonon[coupling]
-                    # get orbital in lattice
-                    orbital = neighbor_table[2,coupling]
+                    # get site in lattice
+                    site = coupling_to_site[coupling]
                     # get couplings
                     αc = α[coupling]
                     α3c = α3[coupling]
-                    # iterate over imaginary time slices
-                    for l in axes(Λ, 1)
-                        # get phonon field
-                        xl = x[phonon, l]
-                        # calculate matrix element
-                        Λ[l,orbital] = exp(+Δτ*(αc * xl + α3c * xl^3)/2) * Λ[l,orbital] 
-                    end
+                    # get views into relevant arrays
+                    Λ_i = @view Λ[:,site]
+                    x_p = @view x[phonon,: ]
+                    # update matrix
+                    @. Λ_i = exp(+Δτ*(αc * x_p + α3c * x_p^3)/2) * Λ_i
                 end
             end
         end
@@ -45,7 +43,7 @@ function update_Λ!(
     return nothing
 end
 
-# evalute |u′⟩ = Λ|u⟩
+# evaluate |u′⟩ = Λ|u⟩
 function mul_Λ!(
     u′::AbstractVecOrMat{T},
     Λ::AbstractMatrix{E},
@@ -57,11 +55,11 @@ function mul_Λ!(
     # length of imaginary-time axis
     Lτ = size(Λ, 1)
     # iterate of orbitals
-    for n in axes(Λ,2)
+    @inbounds for n in axes(Λ,2)
         # record the v[1,n] vector element
         v_1_n = v[1,n]
         # iterate over imaginary time-slices
-        for l in 1:Lτ-1
+        @simd for l in 1:Lτ-1
             # update vector element
             v′[l,n] = Λ[l+1,n] * v[l+1,n]
         end
@@ -84,11 +82,11 @@ function ldiv_Λ!(
     # length of imaginary-time axis
     Lτ = size(Λ, 1)
     # iterate of orbitals
-    for n in axes(Λ,2)
+    @inbounds for n in axes(Λ,2)
         # record the v[Lτ,n] vector element
         v_Lτ_n = v[Lτ,n]
         # iterate over imaginary time-slices
-        for l in Lτ:-1:2
+        @simd for l in Lτ:-1:2
             # update vector element
             v′[l,n] = v[l-1,n] / Λ[l,n]
         end
@@ -100,7 +98,7 @@ function ldiv_Λ!(
 end
 
 
-# evalute |u′⟩ = Λᵀ|u⟩
+# evaluate |u′⟩ = Λᵀ|u⟩
 function mul_Λᵀ!(
     u′::AbstractVecOrMat{T},
     Λ::AbstractMatrix{E},
@@ -112,11 +110,11 @@ function mul_Λᵀ!(
     # length of imaginary-time axis
     Lτ = size(Λ, 1)
     # iterate of orbitals
-    for n in axes(Λ,2)
+    @inbounds for n in axes(Λ,2)
         # record the v[Lτ,n] vector element
         v_Lτ_n = v[Lτ,n]
         # iterate over imaginary time-slices
-        for l in Lτ:-1:2
+        @simd for l in Lτ:-1:2
             # update vector element
             v′[l,n] = Λ[l,n] * v[l-1,n]
         end
@@ -139,11 +137,11 @@ function ldiv_Λᵀ!(
     # length of imaginary-time axis
     Lτ = size(Λ, 1)
     # iterate of orbitals
-    for n in axes(Λ,2)
+    @inbounds for n in axes(Λ,2)
         # record the v[Lτ,n] vector element
         v_1_n = v[1,n]
         # iterate over imaginary time-slices
-        for l in 1:Lτ-1
+        @simd for l in 1:Lτ-1
             # update vector element
             v′[l,n] = v[l+1,n] / Λ[l+1,n]
         end
@@ -165,18 +163,18 @@ function mul_νRe∂Λ∂x!(
 ) where {T<:Number, E<:AbstractFloat}
 
     (; Lτ, Δτ, x, holstein_parameters_up) = electron_phonon_parameters
-    (; Nholstein, nholstein, α, α3, coupling_to_phonon, neighbor_table, shifted) = holstein_parameters_up
+    (; Nholstein, nholstein, α, α3, coupling_to_phonon, coupling_to_site, ph_sym_form) = holstein_parameters_up
     v′ = reshaped(u′, size(Λ))
     v  = reshaped(u, size(Λ))
 
-    # if there are shifted holstein coupling
-    if any(shifted)
+    # if there are particle-hole symmetric form holstein couplings
+    if any(ph_sym_form)
         # number of unit cells in lattice
         Nunitcells = Nholstein ÷ nholstein
         # iterate over types of holstein coupling
-        for nhol in 1:nholstein
+        @inbounds for nhol in 1:nholstein
             # if holstein coupling is shiffted
-            if shifted[nhol]
+            if ph_sym_form[nhol]
                 # iterate over unit cells
                 for uc in 1:Nunitcells
                     # get the holstein coupling
@@ -187,9 +185,9 @@ function mul_νRe∂Λ∂x!(
                     # get phonon
                     phonon = coupling_to_phonon[coupling]
                     # get the site
-                    site = neighbor_table[2, phonon]
+                    site = coupling_to_site[coupling]
                     # iterate over imaginary time slices
-                    for l in axes(Λ, 1)                    
+                    @simd for l in axes(Λ, 1)                    
                         # calculate c⋅Re[⟨v′|∂Λ/∂x|v⟩]
                         Δτ∂Λ∂x = Δτ * (αc + 3*α3c * x[phonon,l]^2)/2 * Λ[l,site]
                         νRe∂Λ∂x[phonon,l] += ν * real( conj(v′[mod1(l-1,Lτ),site]) * Δτ∂Λ∂x * v[l,site] )

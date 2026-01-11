@@ -1,9 +1,17 @@
 @doc raw"""
-    GreensEstimator{T<:AbstractFloat, Dp1, Dp3, Tfft<:AbstractFFTs.Plan, Tifft<:AbstractFFTs.Plan}
+    GreensEstimator{
+        T<:AbstractFloat, D, Dp1, Dp3,
+        Gfft<:AbstractFFTs.Plan, Gifft<:AbstractFFTs.Plan,
+        Cfft<:AbstractFFTs.Plan, Cifft<:AbstractFFTs.Plan,
+    }
 
 This type is used to compute stochastic estimates of the Green's function and other correlation functions.
 """
-struct GreensEstimator{T<:AbstractFloat, D, Dp1, Dp3, Tfft<:AbstractFFTs.Plan, Tifft<:AbstractFFTs.Plan}
+struct GreensEstimator{
+    T<:AbstractFloat, D, Dp1, Dp3,
+    Gfft<:AbstractFFTs.Plan, Gifft<:AbstractFFTs.Plan,
+    Cfft<:AbstractFFTs.Plan, Cifft<:AbstractFFTs.Plan,
+}
 
     Nrv::Int
     V::Int
@@ -11,15 +19,17 @@ struct GreensEstimator{T<:AbstractFloat, D, Dp1, Dp3, Tfft<:AbstractFFTs.Plan, T
     N::Int
     n::Int
     L::NTuple{D, Int}
-    tmp::AbstractArray{Complex{T}, Dp1}
-    CΔ0::AbstractArray{Complex{T}, Dp1}
-    Rt::AbstractArray{Complex{T}, Dp3}
-    GR::AbstractArray{Complex{T}, Dp3}
+    tmp::Array{Complex{T}, Dp1}
+    CΔ0::Array{Complex{T}, Dp1}
+    Rt::Array{Complex{T}, Dp3}
+    GR::Array{Complex{T}, Dp3}
     MtR::Vector{Complex{T}}
-    A::AbstractArray{Complex{T}, Dp1}
-    B::AbstractArray{Complex{T}, Dp1}
-    pfft!::Tfft
-    pifft!::Tifft
+    A::Array{Complex{T}, 1}
+    B::Array{Complex{T}, 1}
+    gfft!::Gfft
+    gifft!::Gifft
+    cfft!::Cfft
+    cifft!::Cifft
 end
 
 @doc raw"""
@@ -80,17 +90,23 @@ function GreensEstimator(
     MtR = zeros(Complex{T}, V)
     tmp = zeros(Complex{T}, L..., Lτ+1)
     CΔ0 = zeros(Complex{T}, Lτ+1, L...)
-    A = zeros(Complex{T}, 2Lτ, L...)
-    B = zeros(Complex{T}, 2Lτ, L...)
-    pfft! = plan_fft!(A, flags=FFTW.PATIENT)
-    pifft! = plan_ifft!(A, flags=FFTW.PATIENT)
+    A = zeros(Complex{T}, 2*N*Lτ)
+    B = zeros(Complex{T}, 2*N*Lτ)
+    A′ = reshape(A, 2*Lτ, L...)
+    A″ = reshape(view(A, 1:N*Lτ), Lτ, L...)
+    gfft! = plan_fft!(A′, flags=FFTW.PATIENT)
+    gifft! = plan_ifft!(A′, flags=FFTW.PATIENT)
+    cfft! = plan_fft!(A″, flags=FFTW.PATIENT)
+    cifft! = plan_ifft!(A″, flags=FFTW.PATIENT)
 
-    # initilaize greens estimator
+    # initialize greens estimator
     Dp1 = D+1
     Dp3 = D+3
-    Tfft = typeof(pfft!)
-    Tifft = typeof(pifft!)
-    greens_estimator = GreensEstimator{E,D,Dp1,Dp3,Tfft,Tifft}(Nrv, V, Lτ, N, n, L, tmp, CΔ0, Rt, GR, MtR, A, B, pfft!, pifft!)
+    Gfft = typeof(gfft!)
+    Gifft = typeof(gifft!)
+    Cfft = typeof(cfft!)
+    Cifft = typeof(cifft!)
+    greens_estimator = GreensEstimator{E,D,Dp1,Dp3,Gfft,Gifft,Cfft,Cifft}(Nrv, V, Lτ, N, n, L, tmp, CΔ0, Rt, GR, MtR, A, B, gfft!, gifft!, cfft!, cifft!)
 
     # update green's function estimator to reflect current fermion determinant matrix
     update_greens_estimator!(
@@ -130,7 +146,7 @@ function update_greens_estimator!(
     #     R[i] = randn(rng, E)
     # end
 
-    # udpate preconditioner
+    # update preconditioner
     update_preconditioner!(preconditioner, fermion_det_matrix, rng)
 
     # iterate over random vectors
@@ -166,7 +182,9 @@ function measure_GΔ0!(
     orbitals::NTuple{2, Int},
 ) where {T<:AbstractFloat}
 
-    (; GR, Rt, A, B, pfft!, pifft!, Lτ) = greens_estimator
+    (; GR, Rt, gfft!, gifft!, Lτ, L, V) = greens_estimator
+    A = reshape(greens_estimator.A, 2Lτ, L...)
+    B = reshape(greens_estimator.B, 2Lτ, L...)
     GΔ0 = greens_estimator.CΔ0
 
     # get the number of random vectors
@@ -193,8 +211,8 @@ function measure_GΔ0!(
         _aperiodic_copyto!(A, GR_a_i)
         _aperiodic_copyto!(B, Rt_b_i)
 
-        # esimate Green's function
-        _translational_average!(GΔ0, A, B, pfft!, pifft!)
+        # estimate Green's function
+        _translational_average!(GΔ0, A, B, gfft!, gifft!)
     end
 
     # normalize Green's function
@@ -219,7 +237,7 @@ end
 #                       = (1/N) sum_i ⟨a(i+r+r₁,τ)⋅bᵀ(i+r₂,0)⟩⋅⟨c(i+r+r₃,τ)⋅dᵀ(i+r₄,0)⟩
 #  for all Δ, where Δ = (r, τ) are displacements in space-time. The letters (a,b,c,d) denote
 # the orbital species, and (r_a,r_b,r_c,r_d) are static displacements in unit cells.
-# the sum over i runs over all N unit cells and averages over translation symmmetry.
+# the sum over i runs over all N unit cells and averages over translation symmetry.
 function measure_GΔ0_GΔ0!(
     correlation::AbstractArray{Complex{T},Dp1},
     greens_estimator::GreensEstimator{T},
@@ -235,9 +253,9 @@ function measure_GΔ0_GΔ0!(
     conj_t0::Bool = false
 ) where {D, Dp1, T<:AbstractFloat, E<:Number}
 
-    (; pfft!, pifft!, GR, Rt, L) = greens_estimator
-    Gl = greens_estimator.A
-    Gr = greens_estimator.B
+    (; cfft!, cifft!, GR, Rt, N, Lτ, L) = greens_estimator
+    Gl = reshape(view(greens_estimator.A, 1:N*Lτ), Lτ, L...) 
+    Gr = reshape(view(greens_estimator.B, 1:N*Lτ), Lτ, L...) 
 
     # get orbital species
     a, b, c, d = orbitals
@@ -261,7 +279,7 @@ function measure_GΔ0_GΔ0!(
     # get number of random vectors
     Nrv = size(Rt, ndims(Rt))
 
-    # get number of pairs of random vectros
+    # get number of pairs of random vectors
     Npairs = binomial(Nrv, 2)
 
     # iterate over all pairs of random vectors
@@ -278,7 +296,7 @@ function measure_GΔ0_GΔ0!(
             _measure_CΔ0!(
                 GΔ0_GΔ0, Gl, Gr,
                 GR_a_r1_n, GR_c_r3_m, Rt_b_r2_n, Rt_d_r4_m,
-                pfft!, pifft!,
+                cfft!, cifft!,
                 tΔ, t0, conj_tΔ, conj_t0
             )
         end
@@ -374,7 +392,7 @@ end
 #                       = (1/N) sum_i ⟨a(i+r+r₁,τ)⋅bᵀ(i+r+r₂,τ)⟩⋅⟨c(i+r₃,0)⋅dᵀ(i+r₄,0)⟩
 # for all Δ, where Δ = (r, τ) are displacements in space-time. The letters (a,b,c,d) denote
 # the orbital species, and (r_a,r_b,r_c,r_d) are static displacements in unit cells.
-# the sum over i runs over all N unit cells and averages over translation symmmetry.
+# the sum over i runs over all N unit cells and averages over translation symmetry.
 function measure_GΔΔ_G00!(
     correlation::AbstractArray{Complex{T}, Dp1},
     greens_estimator::GreensEstimator{T},
@@ -390,9 +408,9 @@ function measure_GΔΔ_G00!(
     conj_t0::Bool = false
 ) where {D, Dp1, T<:AbstractFloat, E<:Number}
 
-    (; pfft!, pifft!, GR, Rt, L) = greens_estimator
-    Gl = greens_estimator.A
-    Gr = greens_estimator.B
+    (; cfft!, cifft!, GR, Rt, N, Lτ, L) = greens_estimator
+    Gl = reshape(view(greens_estimator.A, 1:N*Lτ), Lτ, L...) 
+    Gr = reshape(view(greens_estimator.B, 1:N*Lτ), Lτ, L...) 
 
     # get orbital species
     a, b, c, d = orbitals
@@ -416,7 +434,7 @@ function measure_GΔΔ_G00!(
     # get number of random vectors
     Nrv = size(Rt, ndims(Rt))
 
-    # get number of pairs of random vectros
+    # get number of pairs of random vectors
     Npairs = binomial(Nrv, 2)
 
     # iterate over all pairs of random vectors
@@ -433,7 +451,7 @@ function measure_GΔΔ_G00!(
             _measure_CΔ0!(
                 GΔΔ_G00, Gl, Gr,
                 GR_a_r1_n, Rt_b_r2_n, GR_c_r3_m, Rt_d_r4_m,
-                pfft!, pifft!,
+                cfft!, cifft!,
                 tΔ, t0, conj_tΔ, conj_t0
             )
         end
@@ -453,7 +471,7 @@ end
 #                       = (1/N) sum_i -⟨bᵀ(i+r+r₁,τ)⋅a(i+r₂,0)⟩⋅⟨c(i+r+r₃,τ)⋅dᵀ(i+r₄,0)⟩
 # for all Δ, where Δ = (r, τ) are displacements in space-time. The letters (a,b,c,d) denote
 # the orbital species, and (r_a,r_b,r_c,r_d) are static displacements in unit cells.
-# the sum over i runs over all N unit cells and averages over translation symmmetry.
+# the sum over i runs over all N unit cells and averages over translation symmetry.
 function measure_G0Δ_GΔ0!(
     correlation::AbstractArray{Complex{T}, Dp1},
     greens_estimator::GreensEstimator{T},
@@ -469,9 +487,9 @@ function measure_G0Δ_GΔ0!(
     conj_t0::Bool = false
 ) where {D, Dp1, T<:AbstractFloat, E<:Number}
 
-    (; pfft!, pifft!, GR, Rt, L) = greens_estimator
-    Gl = greens_estimator.A
-    Gr = greens_estimator.B
+    (; cfft!, cifft!, GR, Rt, N, Lτ, L) = greens_estimator
+    Gl = reshape(view(greens_estimator.A, 1:N*Lτ), Lτ, L...) 
+    Gr = reshape(view(greens_estimator.B, 1:N*Lτ), Lτ, L...) 
 
     # get orbital species
     a, b, c, d = orbitals
@@ -495,7 +513,7 @@ function measure_G0Δ_GΔ0!(
     # get number of random vectors
     Nrv = size(Rt, ndims(Rt))
 
-    # get number of pairs of random vectros
+    # get number of pairs of random vectors
     Npairs = binomial(Nrv, 2)
 
     # iterate over all pairs of random vectors
@@ -512,7 +530,7 @@ function measure_G0Δ_GΔ0!(
             _measure_CΔ0!(
                 G0Δ_GΔ0, Gl, Gr,
                 Rt_b_r2_n, GR_c_r3_m, GR_a_r1_n, Rt_d_r4_m,
-                pfft!, pifft!,
+                cfft!, cifft!,
                 tΔ, t0, conj_tΔ, conj_t0
             )
         end
@@ -605,36 +623,30 @@ function _measure_CΔ0!(
     conj_t0::Bool = false
 ) where {Dp1, T<:AbstractFloat, E<:Number}
 
-    # periodic product in imaginary-time extending τ ∈ [0,β-Δτ]
-    # to the range τ ∈ [0,2β-Δτ]
-    _periodic_prod!(AΔBΔ, AΔ, BΔ, tΔ, conj_tΔ)
-    _periodic_prod!(C0D0, C0, D0, t0, conj_t0)
+    if isnothing(tΔ)
+        # calculate A[Δ]⋅B[Δ]
+        @. AΔBΔ = AΔ * BΔ
+    elseif conj_tΔ
+        # calculate tᵀ[Δ]⋅A[Δ]⋅B[Δ]
+        @. AΔBΔ = conj(tΔ) * AΔ * BΔ
+    else
+        # calculate t[Δ]⋅A[Δ]⋅B[Δ]
+        @. AΔBΔ = tΔ * AΔ * BΔ
+    end
+
+    if isnothing(t0)
+        # calculate C[0]⋅D[0]
+        @. C0D0 = C0 * D0
+    elseif conj_t0
+        # calculate tᵀ[0]⋅C[0]⋅D[0]
+        @. C0D0 = conj(t0) * C0 * D0
+    else
+        # calculate t[0]⋅C[0]⋅D[0]
+        @. C0D0 = t0 * C0 * D0
+    end
 
     # estimate C[Δ] = ⟨A[Δ]⋅B[Δ]⋅C[0]⋅D[0]⟩
     _translational_average!(CΔ0, AΔBΔ, C0D0, pfft!, pifft!)
-
-    return nothing
-end
-
-
-# aperiodic element-wise product
-function _periodic_prod!(
-    ab::AbstractArray{T, Dp1},
-    a::AbstractArray{T, Dp1},
-    b::AbstractArray{T, Dp1},
-    t::Union{Nothing, AbstractArray{E, Dp1}} = nothing,
-    conj_t::Bool = false
-) where {Dp1, T<:Number, E<:Number}
-
-    Lτ = size(a, 1)
-    ab′ = selectdim(ab, 1, 1:Lτ)
-    ab″ = selectdim(ab, 1, (Lτ+1):(2*Lτ))
-    if isnothing(t)
-        @. ab′ = a * b
-    else
-        @. ab′ = conj_t ? (conj(t) * a * b) : (t * a * b)
-    end
-    copyto!(ab″, ab′)
 
     return nothing
 end
@@ -646,12 +658,14 @@ function _aperiodic_copyto!(
     a::AbstractArray{T, D}
 ) where {D, T<:Number}
 
-    # length of first dimension
-    L = size(a, 1)
-    ap′ = selectdim(ap, 1, 1:L)
-    ap″ = selectdim(ap, 1, (L+1):(2*L))
-    copyto!(ap′, a)
-    @. ap″ = -ap′
+    Lτ = size(a, 1)
+    ap′ = selectdim(ap, 1, 1:Lτ)
+    ap″ = selectdim(ap, 1, (Lτ+1):(2*Lτ))
+    @inbounds @simd for i in eachindex(ap′, ap″, a)
+        val = a[i]
+        ap′[i] = val
+        ap″[i] = -val
+    end
 
     return nothing
 end
@@ -669,22 +683,30 @@ function _translational_average!(
 ) where {D, T<:AbstractFloat}
 
     Lτ = size(S, 1) - 1
+    
+    # FFT transforms
     mul!(a, pfft!, a)
     mul!(b, pifft!, b)
-    ab = a
-    @. ab = a * b
-    mul!(ab, pifft!, ab)
-    # record the result for τ ∈ [0,β-Δτ]
+    
+    # Element-wise product
+    @. a = a * b
+    
+    # Inverse FFT
+    mul!(a, pifft!, a)
+    
+    # Record the result for τ ∈ [0,β-Δτ]
     S′ = selectdim(S, 1, 1:Lτ)
-    ab′ = selectdim(ab, 1, 1:Lτ)
-    @. S′ += ab′
-    # deal with τ = β boundary condition where S[β] = S[0]
+    a′ = selectdim(a, 1, 1:Lτ)
+    @. S′ += a′
+    
+    # Deal with τ = β boundary condition where S[β] = S[0]
     S″ = selectdim(S, 1, Lτ+1)
-    ab″ = selectdim(ab, 1, 1)
-    @. S″ += ab″
+    a″ = selectdim(a, 1, 1)
+    @. S″ += a″
 
     return nothing
 end
+
 
 # add contraction to correlation array
 function add_contraction_to_correlation!(
@@ -703,5 +725,6 @@ function add_contraction_to_correlation!(
     return nothing
 end
 
+
 # boolean conjugation operation
-bconj(x::Number, b::Bool) = b ? conj(x) : x
+@inline bconj(x::Number, b::Bool) = b ? conj(x) : x

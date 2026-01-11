@@ -1,14 +1,12 @@
-# # 2b) Honeycomb Holstein Model with MPI Parallelization
 
 # ## Import packages
 # We now need to import the [MPI.jl](https://github.com/JuliaParallel/MPI.jl.git) package as well.
 
 using SmoQyElPhQMC
-
 using SmoQyDQMC
 import SmoQyDQMC.LatticeUtilities as lu
-import SmoQyDQMC.JDQMCFramework as dqmcf
 
+using LinearAlgebra
 using Random
 using Printf
 using MPI
@@ -32,10 +30,11 @@ function run_simulation(
     N_updates, # Total number of measurements and measurement updates.
     N_bins, # Number of times bin-averaged measurements are written to file.
     Δτ = 0.05, # Discretization in imaginary time.
-    n_stab = 10, # Numerical stabilization period in imaginary-time slices.
-    δG_max = 1e-6, # Threshold for numerical error corrected by stabilization.
-    symmetric = false, # Whether symmetric propagator definition is used.
-    checkerboard = false, # Whether checkerboard approximation is used.
+    Nt = 25, # Number of time-steps in HMC update.
+    Nrv = 10, # Number of random vectors used to estimate fermionic correlation functions.
+    tol = 1e-10, # CG iterations tolerance.
+    maxiter = 10_000, # Maximum number of CG iterations.
+    write_bins_concurrent = true, # Whether to write HDF5 bins during the simulation.
     seed = abs(rand(Int)), # Seed for random number generator.
     filepath = "." # Filepath to where data folder will be created.
 )
@@ -60,6 +59,7 @@ function run_simulation(
     simulation_info = SimulationInfo(
         filepath = filepath,                     
         datafolder_prefix = datafolder_prefix,
+        write_bins_concurrent = write_bins_concurrent,
         sID = sID,
         pID = pID
     )
@@ -73,31 +73,41 @@ function run_simulation(
     ## Initialize random number generator
     rng = Xoshiro(seed)
 
-    ## Initialize additiona_info dictionary
+    ## Initialize metadata dictionary
     metadata = Dict()
 
     ## Record simulation parameters.
-    metadata["N_therm"] = N_therm
-    metadata["N_updates"] = N_updates
-    metadata["N_bins"] = N_bins
-    metadata["n_stab"] = n_stab
-    metadata["dG_max"] = δG_max
-    metadata["symmetric"] = symmetric
-    metadata["checkerboard"] = checkerboard
-    metadata["seed"] = seed
-    metadata["hmc_acceptance_rate"] = 0.0
-    metadata["reflection_acceptance_rate"] = 0.0
-    metadata["swap_acceptance_rate"] = 0.0
+    metadata["N_therm"] = N_therm  # Number of thermalization updates
+    metadata["N_updates"] = N_updates  # Total number of measurements and measurement updates
+    metadata["N_bins"] = N_bins # Number of times bin-averaged measurements are written to file
+    metadata["maxiter"] = maxiter # Maximum number of conjugate gradient iterations
+    metadata["tol"] = tol # Tolerance used for conjugate gradient solves
+    metadata["Nt"] = Nt # Number of time-steps in HMC update
+    metadata["Nrv"] = Nrv # Number of random vectors used to estimate fermionic correlation functions
+    metadata["seed"] = seed  # Random seed used to initialize random number generator in simulation
+    metadata["hmc_acceptance_rate"] = 0.0 # HMC acceptance rate
+    metadata["reflection_acceptance_rate"] = 0.0 # Reflection update acceptance rate
+    metadata["swap_acceptance_rate"] = 0.0 # Swap update acceptance rate
+    metadata["hmc_iters"] = 0.0 # Avg number of CG iterations per solve in HMC update.
+    metadata["reflection_iters"] = 0.0 # Avg number of CG iterations per solve in reflection update.
+    metadata["swap_iters"] = 0.0 # Avg number of CG iterations per solve in swap update.
+    metadata["measurement_iters"] = 0.0 # Avg number of CG iterations per solve while making measurements.
 
 # ## Initialize model
 # No changes need to made to this section of the code from the previous [2a) Honeycomb Holstein Model](@ref) tutorial.
 
+    ## Define lattice vectors.
+    a1 = [+3/2, +√3/2]
+    a2 = [+3/2, -√3/2]
+
+    ## Define basis vectors for two orbitals in the honeycomb unit cell.
+    r1 = [0.0, 0.0] # Location of first orbital in unit cell.
+    r2 = [1.0, 0.0] # Location of second orbital in unit cell.
+
     ## Define the unit cell.
     unit_cell = lu.UnitCell(
-        lattice_vecs = [[3/2,√3/2],
-                        [3/2,-√3/2]],
-        basis_vecs   = [[0.,0.],
-                        [1.,0.]]
+        lattice_vecs = [a1, a2],
+        basis_vecs   = [r1, r2]
     )
 
     ## Define finite lattice with periodic boundary conditions.
@@ -127,7 +137,7 @@ function run_simulation(
     ## Add the third nearest-neighbor bond in a honeycomb lattice to the model.
     bond_3_id = add_bond!(model_geometry, bond_3)
 
-    ## Set neartest-neighbor hopping amplitude to unity,
+    ## Set nearest-neighbor hopping amplitude to unity,
     ## setting the energy scale in the model.
     t = 1.0
 
@@ -147,7 +157,10 @@ function run_simulation(
     )
 
     ## Define a dispersionless electron-phonon mode to live on each site in the lattice.
-    phonon_1 = PhononMode(orbital = 1, Ω_mean = Ω)
+    phonon_1 = PhononMode(
+        basis_vec = r1,
+        Ω_mean = Ω
+    )
 
     ## Add the phonon mode definition to the electron-phonon model.
     phonon_1_id = add_phonon_mode!(
@@ -155,8 +168,11 @@ function run_simulation(
         phonon_mode = phonon_1
     )
 
-    ## Define a dispersionless electron-phonon mode to live on each site in the lattice.
-    phonon_2 = PhononMode(orbital = 2, Ω_mean = Ω)
+    ## Define a dispersionless electron-phonon mode to live on the second sublattice.
+    phonon_2 = PhononMode(
+        basis_vec = r2,
+        Ω_mean = Ω
+    )
 
     ## Add the phonon mode definition to the electron-phonon model.
     phonon_2_id = add_phonon_mode!(
@@ -167,10 +183,11 @@ function run_simulation(
     ## Define first local Holstein coupling for first phonon mode.
     holstein_coupling_1 = HolsteinCoupling(
         model_geometry = model_geometry,
-        phonon_mode = phonon_1_id,
-        ## Couple the first phonon mode to first orbital in the unit cell.
-        bond = lu.Bond(orbitals = (1,1), displacement = [0, 0]),
-        α_mean = α
+        phonon_id = phonon_1_id,
+        orbital_id = 1,
+        displacement = [0, 0],
+        α_mean = α,
+        ph_sym_form = true,
     )
 
     ## Add the first local Holstein coupling definition to the model.
@@ -180,16 +197,17 @@ function run_simulation(
         model_geometry = model_geometry
     )
 
-    ## Define first local Holstein coupling for first phonon mode.
+    ## Define second local Holstein coupling for second phonon mode.
     holstein_coupling_2 = HolsteinCoupling(
         model_geometry = model_geometry,
-        phonon_mode = phonon_2_id,
-        ## Couple the second phonon mode to second orbital in the unit cell.
-        bond = lu.Bond(orbitals = (2,2), displacement = [0, 0]),
-        α_mean = α
+        phonon_id = phonon_2_id,
+        orbital_id = 2,
+        displacement = [0, 0],
+        α_mean = α,
+        ph_sym_form = true,
     )
 
-    ## Add the first local Holstein coupling definition to the model.
+    ## Add the second local Holstein coupling definition to the model.
     holstein_coupling_2_id = add_holstein_coupling!(
         electron_phonon_model = electron_phonon_model,
         holstein_coupling = holstein_coupling_2,
@@ -224,7 +242,7 @@ function run_simulation(
         rng = rng
     )
 
-# ## Initialize meuasurements
+# ## Initialize measurements
 # No changes need to made to this section of the code from the previous [2a) Honeycomb Holstein Model](@ref) tutorial.
 
     ## Initialize the container that measurements will be accumulated into.
@@ -298,6 +316,18 @@ function run_simulation(
         ]
     )
 
+    ## Initialize measurement of electron Green's function traced
+    ## over both orbitals in the unit cell.
+    initialize_composite_correlation_measurement!(
+        measurement_container = measurement_container,
+        model_geometry = model_geometry,
+        name = "tr_greens",
+        correlation = "greens",
+        id_pairs = [(1,1), (2,2)],
+        coefficients = [1.0, 1.0],
+        time_displaced = true,
+    )
+
     ## Initialize CDW correlation measurement.
     initialize_composite_correlation_measurement!(
         measurement_container = measurement_container,
@@ -310,186 +340,181 @@ function run_simulation(
         integrated = true
     )
 
-    ## Initialize the sub-directories to which the various measurements will be written.
-    initialize_measurement_directories(simulation_info, measurement_container)
+# ## Setup QMC simulation
+# No changes need to made to this section of the code from the previous [2a) Honeycomb Holstein Model](@ref) tutorial.
 
-# ## Setup DQMC simulation
-# In this section of the code we only need to make one very minor change in adding a call to the
-# [`MPI.Barrier`](https://juliaparallel.org/MPI.jl/stable/reference/comm/#MPI.Barrier) function
-# to synchronize all the MPI processes.
-# This ensures that the proper directory structure for the simulation is in place before the simulation begins.
-
-    ## Synchronize all the MPI processes.
-    MPI.Barrier(comm)
-
-    # Allocate a single FermionPathIntegral for both spin-up and down electrons.
+    ## Allocate a single FermionPathIntegral for both spin-up and down electrons.
     fermion_path_integral = FermionPathIntegral(tight_binding_parameters = tight_binding_parameters, β = β, Δτ = Δτ)
 
-    # Initialize FermionPathIntegral type to account for electron-phonon interaction.
+    ## Initialize FermionPathIntegral type to account for electron-phonon interaction.
     initialize!(fermion_path_integral, electron_phonon_parameters)
 
-    # Initialize fermion determinant matrix. Also set the default tolerance and max iteration count
-    # used in conjugate gradient (CG) solves of linear systems involving this matrix.
-    fermion_det_matrix = AsymFermionDetMatrix(
+    ## Initialize fermion determinant matrix. Also set the default tolerance and max iteration count
+    ## used in conjugate gradient (CG) solves of linear systems involving this matrix.
+    fermion_det_matrix = SymFermionDetMatrix(
         fermion_path_integral,
         maxiter = maxiter, tol = tol
     )
 
-    # Initialize pseudofermion field calculator.
+    ## Initialize pseudofermion field calculator.
     pff_calculator = PFFCalculator(electron_phonon_parameters, fermion_det_matrix)
 
-    # Initialize KPM preconditioner.
-    kpm_preconditioner = KPMPreconditioner(fermion_det_matrix, rng = rng)
+    ## Initialize KPM preconditioner.
+    preconditioner = KPMPreconditioner(fermion_det_matrix, rng = rng)
 
-    # Initialize Green's function estimator for making measurements.
+    ## Initialize Green's function estimator for making measurements.
     greens_estimator = GreensEstimator(fermion_det_matrix, model_geometry)
 
-    # Integrated trajectory time; one quarter the period of the bare phonon mode.
-    Tt = π/(2Ω)
-
-    # Fermionic time-step used in HMC update.
-    Δt = Tt/Nt
-
-    hmc_updater = EFAPFFHMCUpdater(
-        electron_phonon_parameters = electron_phonon_parameters,
-        Nt = Nt, Δt = Δt,
-        η = 0.0, # Regularization parameter for exact fourier acceleration (EFA)
-        δ = 0.05 # Fractional max amplitude of noise added to time-step Δt before each HMC update.
-    )
-
-# ## Setup EFA-HMC Updates
+# ## Setup EFA-PFF-HMC Updates
 # No changes need to made to this section of the code from the previous [2a) Honeycomb Holstein Model](@ref) tutorial.
 
-
-    ## Number of fermionic time-steps in HMC update.
-    Nt = 10
-
-    ## Fermionic time-step used in HMC update.
-    Δt = π/(2*Ω*Nt)
-
-    ## Initialize Hamitlonian/Hybrid monte carlo (HMC) updater.
-    hmc_updater = EFAHMCUpdater(
+    ## Initialize Hamiltonian/Hybrid monte carlo (HMC) updater.
+    hmc_updater = EFAPFFHMCUpdater(
         electron_phonon_parameters = electron_phonon_parameters,
-        G = G, Nt = Nt, Δt = Δt
+        Nt = Nt, Δt = π/(2*Nt)
     )
 
 # ## Thermalize system
 # No changes need to made to this section of the code from the previous [2a) Honeycomb Holstein Model](@ref) tutorial.
 
     ## Iterate over number of thermalization updates to perform.
-    for update in 1:N_therm
+    for n in 1:N_therm
 
         ## Perform a reflection update.
-        (accepted, logdetG, sgndetG) = reflection_update!(
-            G, logdetG, sgndetG, electron_phonon_parameters,
+        (accepted, iters) = reflection_update!(
+            electron_phonon_parameters, pff_calculator,
             fermion_path_integral = fermion_path_integral,
-            fermion_greens_calculator = fermion_greens_calculator,
-            fermion_greens_calculator_alt = fermion_greens_calculator_alt,
-            B = B, rng = rng
+            fermion_det_matrix = fermion_det_matrix,
+            preconditioner = preconditioner,
+            rng = rng, tol = tol, maxiter = maxiter
         )
 
         ## Record whether the reflection update was accepted or rejected.
         metadata["reflection_acceptance_rate"] += accepted
 
+        ## Record the number of CG iterations performed for the reflection update.
+        metadata["reflection_iters"] += iters
+
         ## Perform a swap update.
-        (accepted, logdetG, sgndetG) = swap_update!(
-            G, logdetG, sgndetG, electron_phonon_parameters,
+        (accepted, iters) = swap_update!(
+            electron_phonon_parameters, pff_calculator,
             fermion_path_integral = fermion_path_integral,
-            fermion_greens_calculator = fermion_greens_calculator,
-            fermion_greens_calculator_alt = fermion_greens_calculator_alt,
-            B = B, rng = rng
+            fermion_det_matrix = fermion_det_matrix,
+            preconditioner = preconditioner,
+            rng = rng, tol = tol, maxiter = maxiter
         )
 
         ## Record whether the reflection update was accepted or rejected.
         metadata["swap_acceptance_rate"] += accepted
 
+        ## Record the number of CG iterations performed for the reflection update.
+        metadata["swap_iters"] += iters
+
         ## Perform an HMC update.
-        (accepted, logdetG, sgndetG, δG, δθ) = hmc_update!(
-            G, logdetG, sgndetG, electron_phonon_parameters, hmc_updater,
+        (accepted, iters) = hmc_update!(
+            electron_phonon_parameters, hmc_updater,
             fermion_path_integral = fermion_path_integral,
-            fermion_greens_calculator = fermion_greens_calculator,
-            fermion_greens_calculator_alt = fermion_greens_calculator_alt,
-            B = B, δG_max = δG_max, δG = δG, δθ = δθ, rng = rng
+            fermion_det_matrix = fermion_det_matrix,
+            pff_calculator = pff_calculator,
+            preconditioner = preconditioner,
+            tol_action = tol, tol_force = sqrt(tol), maxiter = maxiter,
+            rng = rng,
         )
 
-        ## Record whether the HMC update was accepted or rejected.
+        ## Record the average number of iterations per CG solve for hmc update.
         metadata["hmc_acceptance_rate"] += accepted
+
+        ## Record the number of CG iterations performed for the reflection update.
+        metadata["hmc_iters"] += iters
     end
 
 # ## Make measurements
 # No changes need to made to this section of the code from the previous [2a) Honeycomb Holstein Model](@ref) tutorial.
 
-    ## Reset diagonostic parameters used to monitor numerical stability to zero.
-    δG = zero(logdetG)
-    δθ = zero(sgndetG)
-
     ## Calculate the bin size.
     bin_size = N_updates ÷ N_bins
 
-    ## Iterate over updates and measurements.
+    ## Iterate over bins.
     for update in 1:N_updates
 
         ## Perform a reflection update.
-        (accepted, logdetG, sgndetG) = reflection_update!(
-            G, logdetG, sgndetG, electron_phonon_parameters,
+        (accepted, iters) = reflection_update!(
+            electron_phonon_parameters, pff_calculator,
             fermion_path_integral = fermion_path_integral,
-            fermion_greens_calculator = fermion_greens_calculator,
-            fermion_greens_calculator_alt = fermion_greens_calculator_alt,
-            B = B, rng = rng
+            fermion_det_matrix = fermion_det_matrix,
+            preconditioner = preconditioner,
+            rng = rng, tol = tol, maxiter = maxiter
         )
 
         ## Record whether the reflection update was accepted or rejected.
         metadata["reflection_acceptance_rate"] += accepted
 
+        ## Record the number of CG iterations performed for the reflection update.
+        metadata["reflection_iters"] += iters
+
         ## Perform a swap update.
-        (accepted, logdetG, sgndetG) = swap_update!(
-            G, logdetG, sgndetG, electron_phonon_parameters,
+        (accepted, iters) = swap_update!(
+            electron_phonon_parameters, pff_calculator,
             fermion_path_integral = fermion_path_integral,
-            fermion_greens_calculator = fermion_greens_calculator,
-            fermion_greens_calculator_alt = fermion_greens_calculator_alt,
-            B = B, rng = rng
+            fermion_det_matrix = fermion_det_matrix,
+            preconditioner = preconditioner,
+            rng = rng, tol = tol, maxiter = maxiter
         )
 
         ## Record whether the reflection update was accepted or rejected.
         metadata["swap_acceptance_rate"] += accepted
 
+        ## Record the number of CG iterations performed for the reflection update.
+        metadata["swap_iters"] += iters
+
         ## Perform an HMC update.
-        (accepted, logdetG, sgndetG, δG, δθ) = hmc_update!(
-            G, logdetG, sgndetG, electron_phonon_parameters, hmc_updater,
+        (accepted, iters) = hmc_update!(
+            electron_phonon_parameters, hmc_updater,
             fermion_path_integral = fermion_path_integral,
-            fermion_greens_calculator = fermion_greens_calculator,
-            fermion_greens_calculator_alt = fermion_greens_calculator_alt,
-            B = B, δG_max = δG_max, δG = δG, δθ = δθ, rng = rng
+            fermion_det_matrix = fermion_det_matrix,
+            pff_calculator = pff_calculator,
+            preconditioner = preconditioner,
+            tol_action = tol, tol_force = sqrt(tol), maxiter = maxiter,
+            rng = rng,
         )
 
-        ## Record whether the HMC update was accepted or rejected.
+        ## Record whether the reflection update was accepted or rejected.
         metadata["hmc_acceptance_rate"] += accepted
 
+        ## Record the average number of iterations per CG solve for hmc update.
+        metadata["hmc_iters"] += iters
+
         ## Make measurements.
-        (logdetG, sgndetG, δG, δθ) = make_measurements!(
-            measurement_container,
-            logdetG, sgndetG, G, G_ττ, G_τ0, G_0τ,
+        iters = make_measurements!(
+            measurement_container, fermion_det_matrix, greens_estimator,
+            model_geometry = model_geometry,
             fermion_path_integral = fermion_path_integral,
-            fermion_greens_calculator = fermion_greens_calculator,
-            B = B, δG_max = δG_max, δG = δG, δθ = δθ,
-            model_geometry = model_geometry, tight_binding_parameters = tight_binding_parameters,
-            coupling_parameters = (electron_phonon_parameters,)
+            tight_binding_parameters = tight_binding_parameters,
+            electron_phonon_parameters = electron_phonon_parameters,
+            preconditioner = preconditioner,
+            tol = tol, maxiter = maxiter,
+            rng = rng
         )
 
-        ## Check if bin averaged measurements need to be written to file.
-        if update % bin_size == 0
+        ## Record the average number of iterations per CG solve for measurements.
+        metadata["measurement_iters"] += iters
 
-            ## Write the bin-averaged measurements to file.
-            write_measurements!(
-                measurement_container = measurement_container,
-                simulation_info = simulation_info,
-                model_geometry = model_geometry,
-                bin = update ÷ bin_size,
-                bin_size = bin_size,
-                Δτ = Δτ
-            )
-        end
+        ## Write the bin-averaged measurements to file if update ÷ bin_size == 0.
+        write_measurements!(
+            measurement_container = measurement_container,
+            simulation_info = simulation_info,
+            model_geometry = model_geometry,
+            measurement = update,
+            bin_size = bin_size,
+            Δτ = Δτ
+        )
     end
+
+# ## Merge binned data
+# No changes need to made to this section of the code from the previous [2a) Honeycomb Holstein Model](@ref) tutorial.
+
+    ## Merge binned data into a single HDF5 file.
+    merge_bins(simulation_info)
 
 # ## Record simulation metadata
 # No changes need to made to this section of the code from the previous [2a) Honeycomb Holstein Model](@ref) tutorial.
@@ -499,25 +524,51 @@ function run_simulation(
     metadata["reflection_acceptance_rate"] /= (N_updates + N_therm)
     metadata["swap_acceptance_rate"] /= (N_updates + N_therm)
 
-    ## Record largest numerical error encountered during simulation.
-    metadata["dG"] = δG
+    ## Calculate average number of CG iterations.
+    metadata["hmc_iters"] /= (N_updates + N_therm)
+    metadata["reflection_iters"] /= (N_updates + N_therm)
+    metadata["swap_iters"] /= (N_updates + N_therm)
+    metadata["measurement_iters"] /= N_updates
 
     ## Write simulation metadata to simulation_info.toml file.
     save_simulation_info(simulation_info, metadata)
 
 # ## Post-process results
-# We need start with section with a call to the [`MPI.Barrier`](https://juliaparallel.org/MPI.jl/stable/reference/comm/#MPI.Barrier)
-# function to ensure that we don't begin processing the results until all the simulations running in parallel have finished.
-# Additionally, we need to make sure to call the 
-# the [`process_measurements`](@ref), [`compute_correlation_ratio`](@ref) and [`compress_jld2_bins`](@ref) function
+# The main change we need to make from the previous [2a) Honeycomb Holstein Model](@ref) tutorial is to call
+# the [`process_measurements`](@ref) and [`compute_composite_correlation_ratio`](@ref) functions
 # such that the first argument is the `comm` object, thereby ensuring a parallelized version of each method is called.
 
-    ## Process the simulation results, calculating final error bars for all measurements,
-    ## writing final statisitics to CSV files.
-    process_measurements(comm, simulation_info.datafolder, N_bins, time_displaced = true)
+    ## Process the simulation results, calculating final error bars for all measurements.
+    ## writing final statistics to CSV files.
+    process_measurements(
+        comm,
+        datafolder = simulation_info.datafolder,
+        n_bins = N_bins,
+        export_to_csv = true,
+        scientific_notation = false,
+        decimals = 7,
+        delimiter = " "
+    )
 
-    ## Merge binary files containing binned data into a single file.
-    compress_jld2_bins(comm, folder = simulation_info.datafolder)
+    ## Calculate CDW correlation ratio.
+    Rcdw, ΔRcdw = compute_composite_correlation_ratio(
+        datafolder = simulation_info.datafolder,
+        name = "cdw",
+        type = "equal-time",
+        q_point = (0, 0),
+        q_neighbors = [
+            (1,0),   (0,1),   (1,1),
+            (L-1,0), (0,L-1), (L-1,L-1)
+        ]
+    )
+
+    ## Record the AFM correlation ratio mean and standard deviation.
+    metadata["Rcdw_mean_real"] = real(Rcdw)
+    metadata["Rcdw_mean_imag"] = imag(Rcdw)
+    metadata["Rcdw_std"]       = ΔRcdw
+
+    ## Write simulation summary TOML file.
+    save_simulation_info(simulation_info, metadata)
 
     return nothing
 end # end of run_simulation function
@@ -529,7 +580,7 @@ end # end of run_simulation function
 # At the very end of simulation it is good practice to run the `MPI.Finalize()` function even though
 # it is typically not strictly required.
 
-## Only excute if the script is run directly from the command line.
+## Only execute if the script is run directly from the command line.
 if abspath(PROGRAM_FILE) == @__FILE__
 
     ## Initialize MPI
@@ -562,13 +613,13 @@ end
 # ```
 # This will 16 MPI processes, each running and independent simulation using a different random seed
 # the the final results arrived at by averaging over all 16 walkers.
-# Here `mpiexecjl` is the MPI exectuable that can be easily install using the directions
+# Here `mpiexecjl` is the MPI executable that can be easily install using the directions
 # found [here](https://juliaparallel.org/MPI.jl/stable/usage/#Julia-wrapper-for-mpiexec) in the
 # [MPI.jl](https://github.com/JuliaParallel/MPI.jl) documentation. However, you can substitute a
 # different MPI executable here if one is already configured on your system.
 
 # Also, when submitting jobs via [SLURM](https://slurm.schedmd.com/documentation.html)
-# on a High-Performance Computing (HPC) cluster, if a default MPI exectuable
+# on a High-Performance Computing (HPC) cluster, if a default MPI executable
 # is already configured on the system, as is frequently the case, then the script can likely be run inside the
 # `*.sh` job file using the [`srun`](https://slurm.schedmd.com/srun.html) command:
 # ```bash

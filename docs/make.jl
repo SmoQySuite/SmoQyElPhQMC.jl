@@ -76,11 +76,13 @@ DocMeta.setdocmeta!(SmoQyElPhQMC, :DocTestSetup, :(using SmoQyElPhQMC); recursiv
 
 # build tutorials
 tutorials = ["holstein_honeycomb"]
+# tutorials = ["holstein_honeycomb", "holstein_honeycomb_mpi", "holstein_honeycomb_checkpoint", "holstein_honeycomb_density_tuning"]
 tutorials_sources = [joinpath(pkgdir(SmoQyElPhQMC, "tutorials"), tutorial*".jl") for tutorial in tutorials]
 tutorial_mds = build_examples(tutorials_sources, "tutorials")
 
 # build examples
 examples = []
+# examples = ["ossh_chain", "bssh_chain", "ossh_square", "bssh_square"]
 example_sources = [joinpath(pkgdir(SmoQyElPhQMC, "examples"), example*".jl") for example in examples]
 example_mds = build_examples(example_sources, "examples")
 

@@ -47,21 +47,24 @@ function checkerboard_lmul!(
     end
 
     # iterate over specified sequence of hoppings
-    for h in interval
+    @inbounds for h in interval
         # get the pair of orbitals connected by hopping h
         i = neighbor_table[1, h]
         j = neighbor_table[2, h]
+        # construct relevant views
+        u_i = @view u[:,i]
+        u_j = @view u[:,j]
+        c = @view coshΔτt[:,h]
+        s = @view sinhΔτt[:,h]
         # iterate over imaginary-time slice
-        @simd for l in axes(u, 1)
-            # get relevant cosh and sinh values
-            c_ij = coshΔτt[l, h]
-            s_ij = sinhΔτt[l, h]
-            # get initial vector values that will be modified
-            u_i = u[l,i]
-            u_j = u[l,j]
+        @simd for l in eachindex(u_i)
             # update vector elements
-            u[l,i] = c_ij * u_i + s_ij * u_j
-            u[l,j] = c_ij * u_j + conj(s_ij) * u_i
+            u_li = u_i[l]
+            u_lj = u_j[l]
+            c_ij = c[l]
+            s_ij = s[l]
+            u_i[l] = c_ij * u_li + s_ij * u_lj
+            u_j[l] = c_ij * u_lj + conj(s_ij) * u_li
         end
     end
 
@@ -117,21 +120,24 @@ function checkerboard_ldiv!(
     end
 
     # iterate over specified sequence of hoppings
-    for h in interval
+    @inbounds for h in interval
         # get the pair of orbitals connected by hopping h
         i = neighbor_table[1, h]
         j = neighbor_table[2, h]
+        # construct views
+        u_i = @view u[:,i]
+        u_j = @view u[:,j]
+        c = @view coshΔτt[:,h]
+        s = @view sinhΔτt[:,h]
         # iterate over imaginary-time slice
-        @simd for l in axes(u, 1)
-            # get relevant cosh and sinh values
-            c_ij = coshΔτt[l, h]
-            s_ij = sinhΔτt[l, h]
-            # get initial vector values that will be modified
-            u_i = u[l,i]
-            u_j = u[l,j]
+        @simd for l in eachindex(u_i)
             # update vector elements
-            u[l,i] = c_ij * u_i - s_ij * u_j
-            u[l,j] = c_ij * u_j - conj(s_ij) * u_i
+            u_li = u_i[l]
+            u_lj = u_j[l]
+            c_ij = c[l]
+            s_ij = s[l]
+            u_i[l] = c_ij * u_li - s_ij * u_lj
+            u_j[l] = c_ij * u_lj - conj(s_ij) * u_li
         end
     end
 

@@ -7,7 +7,7 @@
 # # FIELDS
 
 # - `maxiter::Int`: Max number of allowed CG iterations.
-# - `tol::E`: CG tolerance theshold.
+# - `tol::E`: CG tolerance threshold.
 # - `N::Int`: Size of the linear system solver is intended to solve.
 # - `r::Vector{T}`: Vector to avoid temporary memory allocations.
 # - `p::Vector{T}`: Vector to avoid temporary memory allocations.
@@ -41,7 +41,7 @@ end
 # # KEYWORD ARGUMENTS
 
 # - `maxiter::Int`: Max number of allowed CG iterations.
-# - `tol::E = 1e-8`: CG tolerance theshold.
+# - `tol::E = 1e-8`: CG tolerance threshold.
 # """
 function ConjugateGradientSolver(
     # ARGUMENTS
@@ -126,7 +126,7 @@ function cg_solve!(
     # r₀⋅r₀
     rdotr = dot(r,r)
 
-    # calcualte initial tolerance
+    # calculate initial tolerance
     ϵ = norm(r)/normb
 
     # check if linear system is already solved
@@ -134,7 +134,7 @@ function cg_solve!(
         return 0, ϵ
     end
     
-    @fastmath @inbounds for iter in 1:maxiter
+    @inbounds for iter in 1:maxiter
         
         # αⱼ = (rⱼ⋅rⱼ)/(pⱼ⋅A⋅pⱼ)
         mul!(z,A,p)
@@ -177,7 +177,7 @@ function cg_solve!(
     tol::E = cg_solver.tol
 ) where {T<:Number, E<:AbstractFloat}
     
-    (; maxiter, tol, r, p, z) = cg_solver
+    (; r, p, z) = cg_solver
     x = reshaped(x, length(x))
     b = reshaped(b, length(b))
     
@@ -205,7 +205,7 @@ function cg_solve!(
     # r₀⋅z₀
     rdotz = dot(r,z)
 
-    # calcualte initial tolerance
+    # calculate initial tolerance
     ϵ = norm(r)/normb
 
     # check if linear system is already solved
@@ -213,7 +213,7 @@ function cg_solve!(
         return 0, ϵ
     end
     
-    @fastmath @inbounds for iter in 1:maxiter
+    @inbounds for iter in 1:maxiter
         
         # αⱼ = (rⱼ⋅zⱼ)/(pⱼ⋅A⋅pⱼ)
         mul!(z,A,p)

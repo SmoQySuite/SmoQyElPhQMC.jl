@@ -76,7 +76,7 @@ function swap_update!(
     # Calculate total initial action
     S = Sf + Sb
 
-    # substract off the effect of the current phonon configuration on the fermion path integrals
+    # subtract off the effect of the current phonon configuration on the fermion path integrals
     if calculate_exp_V
         SmoQyDQMC.update!(fermion_path_integral, holstein_parameters, x, -1)
     end
@@ -122,7 +122,7 @@ function swap_update!(
     # if update is rejected
     else
         accepted = false
-        # substract off the effect of the current phonon configuration on the fermion path integrals
+        # subtract off the effect of the current phonon configuration on the fermion path integrals
         if calculate_exp_V
             SmoQyDQMC.update!(fermion_path_integral, holstein_parameters, x, -1)
         end

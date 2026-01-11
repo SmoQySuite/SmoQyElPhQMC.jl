@@ -1,7 +1,7 @@
 # # 1a) Honeycomb Holstein Model
 
 # In this example we reimplement the
-# [SmoQyDQMC tuturial](https://smoqysuite.github.io/SmoQyDQMC.jl/stable/tutorials/holstein_honeycomb/)
+# [SmoQyDQMC tutorial](https://smoqysuite.github.io/SmoQyDQMC.jl/stable/tutorials/holstein_honeycomb/)
 # on simulating the Holstein model on a Honeycomb lattice using [SmoQyElPhQMC](https://github.com/SmoQySuite/SmoQyElPhQMC.jl.git).
 # The Holstein Hamiltonian is given by
 # ```math
@@ -23,11 +23,11 @@
 
 # ## Import packages
 # First, we begin by importing the necessary packages.
-# The [SmoQyElPhQMC](https://github.com/SmoQySuite/SmoQyElPhQMC.jl.git) package is built as an extension pacakge on top of
-# [SmoQyDQMC](https://github.com/SmoQySuite/SmoQyDQMC.jl.git), enabling the simulution of strictly spin-symmetric electron-phonon models.
+# The [SmoQyElPhQMC](https://github.com/SmoQySuite/SmoQyElPhQMC.jl.git) package is built as an extension package on top of
+# [SmoQyDQMC](https://github.com/SmoQySuite/SmoQyDQMC.jl.git), enabling the simulation of strictly spin-symmetric electron-phonon models.
 # Therefore, in addition to importing [SmoQyElPhQMC](https://github.com/SmoQySuite/SmoQyElPhQMC.jl.git),
 # we also need to import [SmoQyDQMC](https://github.com/SmoQySuite/SmoQyDQMC.jl.git).
-# The [SmoQyDQMC](https://github.com/SmoQySuite/SmoQyDQMC.jl.git) package also then rexports 
+# The [SmoQyDQMC](https://github.com/SmoQySuite/SmoQyDQMC.jl.git) package also then reexports 
 # the [LatticeUtilities](https://github.com/SmoQySuite/LatticeUtilities.jl.git) package,
 # which we will use to define the lattice geometry for our model.
 
@@ -36,10 +36,10 @@
 # formatting, respectively.
 
 using SmoQyElPhQMC
-
 using SmoQyDQMC
 import SmoQyDQMC.LatticeUtilities as lu
 
+using LinearAlgebra
 using Random
 using Printf
 
@@ -62,10 +62,11 @@ function run_simulation(;
     N_updates, # Total number of measurements and measurement updates.
     N_bins, # Number of times bin-averaged measurements are written to file.
     Δτ = 0.05, # Discretization in imaginary time.
-    Nt = 100, # Numer of time-steps in HMC update.
+    Nt = 25, # Number of time-steps in HMC update.
     Nrv = 10, # Number of random vectors used to estimate fermionic correlation functions.
     tol = 1e-10, # CG iterations tolerance.
-    maxiter = 1000, # Maximum number of CG iterations.
+    maxiter = 10_000, # Maximum number of CG iterations.
+    write_bins_concurrent = true, # Whether to write HDF5 bins during the simulation.
     seed = abs(rand(Int)), # Seed for random number generator.
     filepath = "." # Filepath to where data folder will be created.
 )
@@ -85,6 +86,7 @@ function run_simulation(;
     simulation_info = SimulationInfo(
         filepath = filepath,                     
         datafolder_prefix = datafolder_prefix,
+        write_bins_concurrent = write_bins_concurrent,
         sID = sID
     )
 
@@ -99,34 +101,34 @@ function run_simulation(;
     ## Initialize random number generator
     rng = Xoshiro(seed)
 
-    ## Initialize additiona_info dictionary
+    ## Initialize metadata dictionary
     metadata = Dict()
 
     ## Record simulation parameters.
-    metadata["N_therm"]   = N_therm    # Number of thermalization updates
+    metadata["N_therm"] = N_therm  # Number of thermalization updates
     metadata["N_updates"] = N_updates  # Total number of measurements and measurement updates
-    metadata["N_bins"]    = N_bins     # Number of times bin-averaged measurements are written to file
-    metadata["maxiter"]   = maxiter    # Maximum number of conjugate gradient iterations
-    metadata["tol"]       = tol        # Tolerance used for conjugate gradient solves
-    metadata["Nt"]        = Nt         # Number of time-steps in HMC update
-    metadata["Nrv"]       = Nrv        # Number of random vectors used to estimate fermionic correlation functions
-    metadata["seed"]      = seed       # Random seed used to initialize random number generator in simulation
+    metadata["N_bins"] = N_bins # Number of times bin-averaged measurements are written to file
+    metadata["maxiter"] = maxiter # Maximum number of conjugate gradient iterations
+    metadata["tol"] = tol # Tolerance used for conjugate gradient solves
+    metadata["Nt"] = Nt # Number of time-steps in HMC update
+    metadata["Nrv"] = Nrv # Number of random vectors used to estimate fermionic correlation functions
+    metadata["seed"] = seed  # Random seed used to initialize random number generator in simulation
 # Here we also update variables to keep track of the acceptance rates for the various types of Monte Carlo updates
 # that will be performed during the simulation. This will be discussed in more detail in later sections of the tutorial.
-    metadata["hmc_acceptance_rate"] = 0.0
-    metadata["reflection_acceptance_rate"] = 0.0
-    metadata["swap_acceptance_rate"] = 0.0
+    metadata["hmc_acceptance_rate"] = 0.0 # HMC acceptance rate
+    metadata["reflection_acceptance_rate"] = 0.0 # Reflection update acceptance rate
+    metadata["swap_acceptance_rate"] = 0.0 # Swap update acceptance rate
 # Initialize variables to record the average number of CG iterations for each type of update and measurements.
-    metadata["hmc_iters"] = 0.0
-    metadata["reflection_iters"] = 0.0
-    metadata["swap_iters"] = 0.0
-    metadata["measurement_iters"] = 0.0
+    metadata["hmc_iters"] = 0.0 # Avg number of CG iterations per solve in HMC update.
+    metadata["reflection_iters"] = 0.0 # Avg number of CG iterations per solve in reflection update.
+    metadata["swap_iters"] = 0.0 # Avg number of CG iterations per solve in swap update.
+    metadata["measurement_iters"] = 0.0 # Avg number of CG iterations per solve while making measurements.
 
 # ## Initialize model
 # The next step is define the model we wish to simulate.
 # In this example the relevant model parameters the phonon energy ``\Omega`` (`Ω`), electron-phonon coupling ``\alpha`` (`α`),
 # chemical potential ``\mu`` (`μ`), and lattice size ``L`` (`L`).
-# The neasrest-neighbor hopping amplitude and phonon mass are normalized to unity, ``t = M = 1``.
+# The nearest-neighbor hopping amplitude and phonon mass are normalized to unity, ``t = M = 1``.
 
 # First we define the lattice geometry for our model, relying on the
 # [LatticeUtilities](https://github.com/SmoQySuite/LatticeUtilities.jl.git) package to do so.
@@ -136,12 +138,18 @@ function run_simulation(;
 # the nearest-neighbor and next-nearest-neighbor bonds.
 # All of this information regarding the lattice geometry is then stored in an instance of the [`SmoQyDQMC.ModelGeometry`](@extref) type.
 
+    ## Define lattice vectors.
+    a1 = [+3/2, +√3/2]
+    a2 = [+3/2, -√3/2]
+
+    ## Define basis vectors for two orbitals in the honeycomb unit cell.
+    r1 = [0.0, 0.0] # Location of first orbital in unit cell.
+    r2 = [1.0, 0.0] # Location of second orbital in unit cell.
+
     ## Define the unit cell.
     unit_cell = lu.UnitCell(
-        lattice_vecs = [[3/2,√3/2],
-                        [3/2,-√3/2]],
-        basis_vecs   = [[0.,0.],
-                        [1.,0.]]
+        lattice_vecs = [a1, a2],
+        basis_vecs   = [r1, r2]
     )
 
     ## Define finite lattice with periodic boundary conditions.
@@ -173,7 +181,7 @@ function run_simulation(;
 
 # Next we specify the Honeycomb tight-binding term in our Hamiltonian with the [`SmoQyDQMC.TightBindingModel`](@extref) type.
 
-    ## Set neartest-neighbor hopping amplitude to unity,
+    ## Set nearest-neighbor hopping amplitude to unity,
     ## setting the energy scale in the model.
     t = 1.0
 
@@ -198,7 +206,10 @@ function run_simulation(;
 # using the [`SmoQyDQMC.PhononMode`](@extref) type and [`SmoQyDQMC.add_phonon_mode!`](@extref) function.
 
     ## Define a dispersionless electron-phonon mode to live on each site in the lattice.
-    phonon_1 = PhononMode(orbital = 1, Ω_mean = Ω)
+    phonon_1 = PhononMode(
+        basis_vec = r1,
+        Ω_mean = Ω
+    )
 
     ## Add the phonon mode definition to the electron-phonon model.
     phonon_1_id = add_phonon_mode!(
@@ -206,8 +217,11 @@ function run_simulation(;
         phonon_mode = phonon_1
     )
 
-    ## Define a dispersionless electron-phonon mode to live on each site in the lattice.
-    phonon_2 = PhononMode(orbital = 2, Ω_mean = Ω)
+    ## Define a dispersionless electron-phonon mode to live on the second sublattice.
+    phonon_2 = PhononMode(
+        basis_vec = r2,
+        Ω_mean = Ω
+    )
 
     ## Add the phonon mode definition to the electron-phonon model.
     phonon_2_id = add_phonon_mode!(
@@ -221,10 +235,11 @@ function run_simulation(;
     ## Define first local Holstein coupling for first phonon mode.
     holstein_coupling_1 = HolsteinCoupling(
         model_geometry = model_geometry,
-        phonon_mode = phonon_1_id,
-        ## Couple the first phonon mode to first orbital in the unit cell.
-        bond = lu.Bond(orbitals = (1,1), displacement = [0, 0]),
-        α_mean = α
+        phonon_id = phonon_1_id,
+        orbital_id = 1,
+        displacement = [0, 0],
+        α_mean = α,
+        ph_sym_form = true,
     )
 
     ## Add the first local Holstein coupling definition to the model.
@@ -234,16 +249,17 @@ function run_simulation(;
         model_geometry = model_geometry
     )
 
-    ## Define first local Holstein coupling for first phonon mode.
+    ## Define second local Holstein coupling for second phonon mode.
     holstein_coupling_2 = HolsteinCoupling(
         model_geometry = model_geometry,
-        phonon_mode = phonon_2_id,
-        ## Couple the second phonon mode to second orbital in the unit cell.
-        bond = lu.Bond(orbitals = (2,2), displacement = [0, 0]),
-        α_mean = α
+        phonon_id = phonon_2_id,
+        orbital_id = 2,
+        displacement = [0, 0],
+        α_mean = α,
+        ph_sym_form = true,
     )
 
-    ## Add the first local Holstein coupling definition to the model.
+    ## Add the second local Holstein coupling definition to the model.
     holstein_coupling_2_id = add_holstein_coupling!(
         electron_phonon_model = electron_phonon_model,
         holstein_coupling = holstein_coupling_2,
@@ -270,8 +286,8 @@ function run_simulation(;
 # types are agnostic to the size of the lattice being simulated,
 # defining the model in a translationally invariant way. As [SmoQyDQMC](https://github.com/SmoQySuite/SmoQyDQMC.jl.git) and
 # [SmoQyElPhQMC](https://github.com/SmoQySuite/SmoQyElPhQMC.jl.git) supports
-# random disorder in the terms appearing in the Hamiltonian, it is necessary to initialize seperate parameter values for each unit cell in the lattice.
-# For instance, we need to initialize a seperate number to represent the on-site energy for each orbital in our finite lattice.
+# random disorder in the terms appearing in the Hamiltonian, it is necessary to initialize separate parameter values for each unit cell in the lattice.
+# For instance, we need to initialize a separate number to represent the on-site energy for each orbital in our finite lattice.
 
     ## Initialize tight-binding parameters.
     tight_binding_parameters = TightBindingParameters(
@@ -289,7 +305,7 @@ function run_simulation(;
         rng = rng
     )
 
-# ## Initialize meuasurements
+# ## Initialize measurements
 # Having initialized both our model and the corresponding model parameters,
 # the next step is to initialize the various measurements we want to make during our DQMC simulation.
 
@@ -365,7 +381,23 @@ function run_simulation(;
     )
 
 # It is also useful to initialize more specialized composite correlation function measurements.
-# Specifically, to detect the formation of charge-density wave order where the electrons preferentially
+
+# First, it can be useful to measure the time-displaced single-particle electron Green's function traced over both orbitals in the unit cell.
+# We can easily implement this measurement using the [`SmoQyDQMC.initialize_composite_correlation_measurement!`](@extref) function, as shown below.
+
+    ## Initialize measurement of electron Green's function traced
+    ## over both orbitals in the unit cell.
+    initialize_composite_correlation_measurement!(
+        measurement_container = measurement_container,
+        model_geometry = model_geometry,
+        name = "tr_greens",
+        correlation = "greens",
+        id_pairs = [(1,1), (2,2)],
+        coefficients = [1.0, 1.0],
+        time_displaced = true,
+    )
+
+# Additionally, to detect the formation of charge-density wave order where the electrons preferentially
 # localize on one of the two sub-lattices of the honeycomb lattice, it is useful to measure the correlation function
 # ```math
 # C_\text{cdw}(\mathbf{r},\tau) = \frac{1}{L^2}\sum_{\mathbf{i}} \langle \hat{\Phi}^{\dagger}_{\mathbf{i}+\mathbf{r}}(\tau) \hat{\Phi}^{\phantom\dagger}_{\mathbf{i}}(0) \rangle,
@@ -377,7 +409,7 @@ function run_simulation(;
 # and ``\hat{n}_{\mathbf{i},\gamma} = (\hat{n}_{\uparrow,\mathbf{i},o} + \hat{n}_{\downarrow,\mathbf{i},o})`` is the total electron number
 # operator for orbital ``\gamma \in \{A,B\}`` in unit cell ``\mathbf{i}``.
 # It is then also useful to calculate the corresponding structure factor ``S_\text{cdw}(\mathbf{q},\tau)`` and susceptibility ``\chi_\text{cdw}(\mathbf{q}).``
-# This can all be easily calculated using the [`SmoQyDQMC.initialize_composite_correlation_measurement!`](@extref) function, as shown below.
+# Again, this can all be easily calculated using the [`SmoQyDQMC.initialize_composite_correlation_measurement!`](@extref) function, as shown below.
 
     ## Initialize CDW correlation measurement.
     initialize_composite_correlation_measurement!(
@@ -387,16 +419,10 @@ function run_simulation(;
         correlation = "density",
         ids = [1, 2],
         coefficients = [1.0, -1.0],
+        displacement_vecs = [[0.0, 0.0], [0.0, 0.0]],
         time_displaced = false,
         integrated = true
     )
-
-# The [`SmoQyDQMC.initialize_measurement_directories`](@extref) can now be used used to initialize the various subdirectories
-# in the data folder that the measurements will be written to.
-# Again, for more information refer to the Simulation Output Overview page.
-
-    ## Initialize the sub-directories to which the various measurements will be written.
-    initialize_measurement_directories(simulation_info, measurement_container)
 
 # ## Setup QMC Simulation
 # This section of the code sets up the QMC simulation by allocating the initializing the relevant types and arrays we will need in the simulation.
@@ -438,13 +464,13 @@ function run_simulation(;
 # call modifies the
 # [`SmoQyDQMC.FermionPathIntegral`](@extref) to reflect the contribution from the initial phonon field configuration.
 
-# Next we initialize an instance of the [`AsymFermionDetMatrix`](@ref) type of represent the Fermion determinant matrix,
-# where is an inherited type from the abstracy [`FermionDetMatrix`](@ref) type.
-# We could have used an instance of the [`SymFermionDetMatrix`](@ref) here instead if we wanted to.
+# Next we initialize an instance of the [`SymFermionDetMatrix`](@ref) type of represent the Fermion determinant matrix,
+# where is an inherited type from the abstract [`FermionDetMatrix`](@ref) type.
+# We could have used an instance of the [`AsymFermionDetMatrix`](@ref) here instead if we wanted to.
 
     ## Initialize fermion determinant matrix. Also set the default tolerance and max iteration count
     ## used in conjugate gradient (CG) solves of linear systems involving this matrix.
-    fermion_det_matrix = AsymFermionDetMatrix(
+    fermion_det_matrix = SymFermionDetMatrix(
         fermion_path_integral,
         maxiter = maxiter, tol = tol
     )
@@ -456,7 +482,7 @@ function run_simulation(;
 # S_F(x,\Phi) = \Phi^\dagger \left[\Lambda^\dagger(x) M^\dagger(x) M^{\phantom\dagger}(x) \Lambda^{\phantom\dagger}(x)\right]^{-1} \Phi^{\phantom\dagger};
 # ```
 # where ``M(x)`` is the fermion determinant matrix and ``\Lambda(x)`` is a unitary transformation specially chosen to improve sampling.
-# These auxialary fields result from replacing the fermion determinants by a complex multivariate Gaussian integral
+# These auxiliary fields result from replacing the fermion determinants by a complex multivariate Gaussian integral
 # ```math
 # |\det M(x)|^2 \propto \int d\Phi e^{-S_F(x,\Phi)}.
 # ```
@@ -473,7 +499,7 @@ function run_simulation(;
 # We use the [`KPMPreconditioner`](@ref) type to accelerate the convergence of the CG calculations, thereby accelerating the simulations.
 
     ## Initialize KPM preconditioner.
-    kpm_preconditioner = KPMPreconditioner(fermion_det_matrix, rng = rng)
+    preconditioner = KPMPreconditioner(fermion_det_matrix, rng = rng)
 
 # Finally, we initialize an instance of the [`GreensEstimator`](@ref) type, which is for
 # estimating fermionic correlation functions when making measurements.
@@ -481,43 +507,34 @@ function run_simulation(;
     ## Initialize Green's function estimator for making measurements.
     greens_estimator = GreensEstimator(fermion_det_matrix, model_geometry)
 
-# ## [Setup EFA-HMC Updates](@id holstein_square_efa-hmc_updates)
-# Before we begin the simulation, we also want to initialize an instance of the
-# [`EFAPFFHMCUpdater`](@ref) type, which will be used to perform hybrid Monte Carlo (HMC)
-# udpates to the phonon fields that use exact fourier acceleration (EFA)
-# to further reduce autocorrelation times.
+# ## [Setup EFA-PFF-HMC Updates](@id holstein_square_efa-hmc_updates)
+# Before we begin the simulation, we also want to initialize an instance of the [`EFAPFFHMCUpdater`](@ref) type,
+# which will be used to perform hybrid Monte Carlo (HMC) updates to the phonon fields that use
+# exact fourier acceleration (EFA) to further reduce autocorrelation times.
 
 # The two main parameters that need to be specified are the time-step size ``\Delta t`` and number of time-steps ``N_t``
 # performed in the HMC update, with the corresponding integrated trajectory time then equalling ``T_t = N_t \cdot \Delta t.``
-# Note that the computational cost of an HMC update is linearly proportional to ``N_t,`` while the acceptance rate is inversely
-# proportional to ``\Delta t.``
+# Note that the computational cost of an HMC update is linearly proportional to ``N_t,`` while the acceptance rate is
+# approximately proportional to ``1/(\Delta t)^2.``
 
 # [Previous studies](https://arxiv.org/abs/2404.09723) have shown that a good place to start
-# with the integrated trajectory time ``T_t`` is a quarter the period of the bare phonon mode,
-# ``T_t \approx \frac{1}{4} \left( \frac{2\pi}{\Omega} \right) = \pi/(2\Omega).``
-# It is also important to keep the acceptance rate for the HMC updates above ``\sim 90\%`` to help prevent numerical instabilities from occuring.
+# with the integrated trajectory time ``T_t`` is a quarter the period associated with the bare phonon frequency,
+# ``T_t \approx \frac{1}{4} \left( \frac{2\pi}{\Omega} \right) = \pi/(2\Omega).`` However, in our implementation we effectively normalize all of the
+# bare phonon frequencies to unity in the dynamics. Therefore, a good choice for the trajectory time in our implementation is simply ``T_t = \pi/2``.
+# Therefore, in most cases you simply need to select a value for ``N_t`` and then use the default assigned time-step ``\Delta t = \pi / (2 N_t)``,
+# such that the trajectory length is held fixed at ``T_t = \pi/2``.
+# With this convention the computational cost of performing updates still increases linearly with ``N_t``, but the acceptance rate also increases with ``N_t``.
+# Note that it can be important to keep the acceptance rate for the HMC updates above ``\sim 90\%`` to avoid numerical instabilities from occuring.
 
-# Based on user experience, a good (conservative) starting place is to set the number of time-step to ``N_t \approx 100,``
-# and then set the time-step size to ``\Delta t \approx \pi/(2\Omega N_t),``
-# effectively setting the integrated trajectory time to ``T_t = \pi/(2\Omega).``
-# Then, if the acceptance rate is too low you increase ``N_t,`` which results in a reduction of ``\Delta t.``
-# Conversely, if the acceptance rate is very high ``(\gtrsim 99 \% )`` it can be useful to decrease ``N_t``,
+# Based on user experience, a good (conservative) starting place is to set the number of time-steps to ``N_t \approx 10.``
+# Then, if the acceptance rate is too low you increase ``N_t,`` which implicitly results in a reduction of ``\Delta t.``
+# Conversely, if the acceptance rate is very high ``(\gtrsim 99 \% )`` it may be useful to decrease ``N_t``,
 # thereby increasing ``\Delta t,`` as this will reduce the computational cost of performing an EFA-HMC update.
 
-# The following code initializes the EFA-HMC updater, and sets the time-step size and number of time-steps
-
-    ## Integrated trajectory time; one quarter the period of the bare phonon mode.
-    Tt = π/(2Ω)
-
-    ## Fermionic time-step used in HMC update.
-    Δt = Tt/Nt
-
-    # Initialize Hamitlonian/Hybrid monte carlo (HMC) updater.
+    ## Initialize Hamiltonian/Hybrid monte carlo (HMC) updater.
     hmc_updater = EFAPFFHMCUpdater(
         electron_phonon_parameters = electron_phonon_parameters,
-        Nt = Nt, Δt = Δt,
-        η = 0.0, # Regularization parameter for exact fourier acceleration (EFA)
-        δ = 0.05 # Fractional max amplitude of noise added to time-step Δt before each HMC update.
+        Nt = Nt, Δt = π/(2*Nt)
     )
 
 # ## Thermalize system
@@ -534,7 +551,7 @@ function run_simulation(;
             electron_phonon_parameters, pff_calculator,
             fermion_path_integral = fermion_path_integral,
             fermion_det_matrix = fermion_det_matrix,
-            preconditioner = kpm_preconditioner,
+            preconditioner = preconditioner,
             rng = rng, tol = tol, maxiter = maxiter
         )
 
@@ -549,7 +566,7 @@ function run_simulation(;
             electron_phonon_parameters, pff_calculator,
             fermion_path_integral = fermion_path_integral,
             fermion_det_matrix = fermion_det_matrix,
-            preconditioner = kpm_preconditioner,
+            preconditioner = preconditioner,
             rng = rng, tol = tol, maxiter = maxiter
         )
 
@@ -565,7 +582,7 @@ function run_simulation(;
             fermion_path_integral = fermion_path_integral,
             fermion_det_matrix = fermion_det_matrix,
             pff_calculator = pff_calculator,
-            preconditioner = kpm_preconditioner,
+            preconditioner = preconditioner,
             tol_action = tol, tol_force = sqrt(tol), maxiter = maxiter,
             rng = rng,
         )
@@ -593,7 +610,7 @@ function run_simulation(;
             electron_phonon_parameters, pff_calculator,
             fermion_path_integral = fermion_path_integral,
             fermion_det_matrix = fermion_det_matrix,
-            preconditioner = kpm_preconditioner,
+            preconditioner = preconditioner,
             rng = rng, tol = tol, maxiter = maxiter
         )
 
@@ -608,7 +625,7 @@ function run_simulation(;
             electron_phonon_parameters, pff_calculator,
             fermion_path_integral = fermion_path_integral,
             fermion_det_matrix = fermion_det_matrix,
-            preconditioner = kpm_preconditioner,
+            preconditioner = preconditioner,
             rng = rng, tol = tol, maxiter = maxiter
         )
 
@@ -624,7 +641,7 @@ function run_simulation(;
             fermion_path_integral = fermion_path_integral,
             fermion_det_matrix = fermion_det_matrix,
             pff_calculator = pff_calculator,
-            preconditioner = kpm_preconditioner,
+            preconditioner = preconditioner,
             tol_action = tol, tol_force = sqrt(tol), maxiter = maxiter,
             rng = rng,
         )
@@ -642,7 +659,7 @@ function run_simulation(;
             fermion_path_integral = fermion_path_integral,
             tight_binding_parameters = tight_binding_parameters,
             electron_phonon_parameters = electron_phonon_parameters,
-            preconditioner = kpm_preconditioner,
+            preconditioner = preconditioner,
             tol = tol, maxiter = maxiter,
             rng = rng
         )
@@ -650,25 +667,30 @@ function run_simulation(;
         ## Record the average number of iterations per CG solve for measurements.
         metadata["measurement_iters"] += iters
 
-        ## Check if bin averaged measurements need to be written to file.
-        if update % bin_size == 0
-
-            ## Write the bin-averaged measurements to file.
-            write_measurements!(
-                measurement_container = measurement_container,
-                simulation_info = simulation_info,
-                model_geometry = model_geometry,
-                bin = update ÷ bin_size,
-                bin_size = bin_size,
-                Δτ = Δτ
-            )
-        end
+        ## Write the bin-averaged measurements to file if update ÷ bin_size == 0.
+        write_measurements!(
+            measurement_container = measurement_container,
+            simulation_info = simulation_info,
+            model_geometry = model_geometry,
+            measurement = update,
+            bin_size = bin_size,
+            Δτ = Δτ
+        )
     end
+
+# ## Merge binned data
+# At this point the simulation is essentially complete, with all updates and measurements having been performed.
+# However, the binned measurement data resides in many separate HDF5 files currently.
+# Here we will merge these separate HDF5 files into a single file containing all the binned data
+# using the [`SmoQyDQMC.merge_bins`](@extref) function.
+
+    ## Merge binned data into a single HDF5 file.
+    merge_bins(simulation_info)
 
 # ## Record simulation metadata
 # At this point we are done sampling and taking measurements.
 # Next, we want to calculate the final acceptance rate for the various types of
-# udpates we performed, as well as write the simulation metadata to file,
+# updates we performed, as well as write the simulation metadata to file,
 # including the contents of the `metadata` dictionary.
 
     ## Calculate acceptance rates.
@@ -685,17 +707,76 @@ function run_simulation(;
     ## Write simulation metadata to simulation_info.toml file.
     save_simulation_info(simulation_info, metadata)
 
-# ## Process results
-# In this final section of code we process the binned data, calculating final estimates for the mean and error of all measured observables.
-# The final statistics are written to CSV files using the function `process_measurements` function.
-# For more information refer to here.
+# ## Post-process results
+# In this final section of code we post-process the binned data.
+# This includes calculating the final estimates for the mean and error of all measured observables,
+# which will be written to an HDF5 file using the [`SmoQyDQMC.process_measurements`](@extref) function.
+# Inside this function the binned data gets further re-binned into `n_bins`,
+# where `n_bins` is any positive integer satisfying the constraints `(N_bins ≥ n_bin)` and `(N_bins % n_bins == 0)`.
+# Note that the [`SmoQyDQMC.process_measurements`](@extref) function has many additional keyword arguments that can be used to control the output.
+# For instance, in this example in addition to writing the statistics to an HDF5 file, we also export the statistics to CSV files
+# by setting `export_to_csv = true`, with additional keyword arguments controlling the formatting of the CSV files.
+# Again, for more information on how to interpret the output refer the
+# [Simulation Output Overview](https://smoqysuite.github.io/SmoQyDQMC.jl/stable/simulation_output/) page.
 
-    ## Process the simulation results, calculating final error bars for all measurements,
-    ## writing final statisitics to CSV files.
-    process_measurements(simulation_info.datafolder, N_bins, time_displaced = false)
+    ## Process the simulation results, calculating final error bars for all measurements.
+    ## writing final statistics to CSV files.
+    process_measurements(
+        datafolder = simulation_info.datafolder,
+        n_bins = N_bins,
+        export_to_csv = true,
+        scientific_notation = false,
+        decimals = 7,
+        delimiter = " "
+    )
 
-    ## Merge binary files containing binned data into a single file.
-    compress_jld2_bins(folder = simulation_info.datafolder)
+# A common measurement that needs to be computed at the end of a DQMC simulation is something called the correlation
+# ratio with respect to the ordering wave-vector for a specified type of structure factor measured during the simulation.
+# In the case of the honeycomb Holstein model, we are interested in measuring the correlation ratio
+# ```math
+# R_\text{cdw}(0) = 1 - \frac{1}{4} \sum_{\delta\mathbf{q}} \frac{S_\text{cdw}(0 + \delta\mathbf{q})}{S_\text{cdw}(0)}
+# ```
+# with respect to the equal-time charge density wave (CDW) structure factor ``S_\text{cdw}(0)``, where ````S_\text{cdw}(q)``` is
+# equal-time structure factor corresponding to the composite correlation function ``C_\text{cdw}(\mathbf{r},\tau)`` defined earlier in this tutorial.
+# Note that the CDW ordering wave-vector is ``\mathbf{Q}_\text{cdw} = 0`` in this case, which describes the electrons preferentially
+# localizing on one of the two sub-lattices of the honeycomb lattice.
+# The sum over ``\delta\mathbf{q}`` runs over the four wave-vectors that neighbor ``\mathbf{Q}_\text{cdw} = 0.``
+
+# Here we use the [`SmoQyDQMC.compute_composite_correlation_ratio`](@extref) function to compute to compute this correlation ratio.
+# Note that the ``\mathbf{Q}_\text{cdw} = 0`` is specified using the `q_point` keyword argument, and the four neighboring wave-vectors
+# ``\delta\mathbf{q}`` are specified using the `q_neighbors` keyword argument.
+# These wave-vectors are specified using the convention described
+# [here](https://smoqysuite.github.io/SmoQyDQMC.jl/stable/simulation_output/#vector_reporting_conventions) in the
+# [Simulation Output Overview](https://smoqysuite.github.io/SmoQyDQMC.jl/stable/simulation_output/) page.
+# Note that because the honeycomb lattice has a ``C_6`` rotation symmetry, each wave-vector in momentum-space has six nearest-neighbor wave-vectors.
+# Below we specify all six wave-vectors that neighbor the ``\mathbf{Q}_\text{cdw} = 0`` wave-vector ordering wave-vector, accounting for the fact
+# that the Brillouin zone is periodic in the reciprocal lattice vectors.
+
+    ## Calculate CDW correlation ratio.
+    Rcdw, ΔRcdw = compute_composite_correlation_ratio(
+        datafolder = simulation_info.datafolder,
+        name = "cdw",
+        type = "equal-time",
+        q_point = (0, 0),
+        q_neighbors = [
+            (1,0),   (0,1),   (1,1),
+            (L-1,0), (0,L-1), (L-1,L-1)
+        ]
+    )
+
+# Next, we record the measurement in the `metadata` dictionary, and then write a new version of the simulation summary TOML file that
+# contains this new information using the [`SmoQyDQMC.save_simulation_info`](@extref) function.
+
+    ## Record the AFM correlation ratio mean and standard deviation.
+    metadata["Rcdw_mean_real"] = real(Rcdw)
+    metadata["Rcdw_mean_imag"] = imag(Rcdw)
+    metadata["Rcdw_std"]       = ΔRcdw
+
+    ## Write simulation summary TOML file.
+    save_simulation_info(simulation_info, metadata)
+
+# Note that as long as the binned data persists the [`SmoQyDQMC.process_measurements`](@extref) and [`SmoQyDQMC.compute_correlation_ratio`](@extref)
+# functions can be rerun to recompute the final statistics for the measurements without needing to rerun the simulation.
 
     return nothing
 end # end of run_simulation function
@@ -705,7 +786,7 @@ end # end of run_simulation function
 # With this in mind, the following block of code only executes if the Julia script is run from the command line,
 # also reading in additional command line arguments.
 
-## Only excute if the script is run directly from the command line.
+## Only execute if the script is run directly from the command line.
 if abspath(PROGRAM_FILE) == @__FILE__
 
     ## Run the simulation.
@@ -730,6 +811,6 @@ end
 # at half-filling ``(\mu = 0)`` and inverse temperature ``\beta = 4.0``.
 # The phonon energy is set to ``\Omega = 1.0`` and the electron-phonon coupling is set to ``\alpha = 1.5.``
 # In the DQMC simulation, 5,000 EFA-HMC, reflection and swap updates are performed to thermalize the system.
-# Then an additional 10,000 such udpates are performed, after each of set of which measurements are made.
+# Then an additional 10,000 such updates are performed, after each of set of which measurements are made.
 # During the simulation, bin-averaged measurements are written to file 100 times,
 # with each bin of data containing the average of 10,000/100 = 100 sequential measurements.

@@ -8,7 +8,10 @@ using Statistics
 using ShiftedArrays
 using CircularArrays
 using StaticArrays
+using PkgVersion
 
+# get and set package version number as global constant
+const SMOQYELPHQMC_VERSION = PkgVersion.@Version 0
 
 # Reshapes with zero allocations, returns an instance of Base.ReshapedArray.
 # Discussion found at: https://github.com/JuliaLang/julia/issues/36313
@@ -24,7 +27,7 @@ reshaped(a::AbstractArray, dims::NTuple{N,Int}) where {N} = Base.ReshapedArray(a
 #     return reshaped(a, dims)
 # end
 
-# import function for calculating checkerboard decomosition
+# import function for calculating checkerboard decomposition
 import Checkerboard: checkerboard_decomposition!
 
 # for representing checkerboard matrix
@@ -78,7 +81,7 @@ export KPMPreconditioner, SymKPMPreconditioner, AsymKPMPreconditioner
 include("PFFCalculator.jl")
 export PFFCalculator
 
-# For performing HMC udpates to phonon fields that use exact fourier acceleration (EFA)
+# For performing HMC updates to phonon fields that use exact fourier acceleration (EFA)
 # to improve sampling
 import SmoQyDQMC: hmc_update!
 include("EFAPFFHMCUpdater.jl")

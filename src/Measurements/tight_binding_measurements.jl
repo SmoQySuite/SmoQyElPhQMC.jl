@@ -48,12 +48,6 @@ function make_tight_binding_measurements!(
             local_measurements["hopping_inversion_up"][hopping_id] += tbar
             local_measurements["hopping_inversion_dn"][hopping_id] += tbar
             local_measurements["hopping_inversion"][hopping_id] += tbar
-
-            # measure hopping inversion
-            tbar = measure_hopping_inversion_avg(tight_binding_parameters, fermion_path_integral, hopping_id)
-            local_measurements["hopping_inversion_avg_up"][hopping_id] += tbar
-            local_measurements["hopping_inversion_avg_dn"][hopping_id] += tbar
-            local_measurements["hopping_inversion_avg"][hopping_id] += tbar
         end
     end
 
@@ -109,58 +103,50 @@ function measure_bare_hopping_energy(
     hopping_id::Int
 ) where {D, T<:Number, E<:AbstractFloat}
 
-    (; GR, Rt, N, L, n, Lτ, Nrv) = greens_estimator
-    (; t, neighbor_table, bond_slices, bond_ids) = tight_binding_parameters
+    (; N, n, Lτ, Nrv) = greens_estimator
+    (; bond_slices) = tight_binding_parameters
 
     # initialize hopping energy to zero
     h = zero(Complex{E})
 
-    # get bond ID associated with hopping ID
-    bond_id = bond_ids[hopping_id]
+    # get the hopping associated with the hopping id
+    t = @view tight_binding_parameters.t[bond_slices[hopping_id]]
 
-    # get the relevant bond
-    bond = model_geometry.bonds[bond_id]
+    # get the neighbor table associated with the hopping id
+    neighbor_table = @view tight_binding_parameters.neighbor_table[:,bond_slices[hopping_id]]
 
-    # get the hopping associated with the bond/hopping in question
-    t′ = @view t[bond_slices[hopping_id]]
-    t″ = reshape(t′, L)
+    # total number of sites in lattice given that N is number of unit cells
+    # and n is the number of orbitals per unit cell
+    Nsites = N * n
 
-    # get the relevant orbital species
-    b, a = bond.orbitals
+    # get random vector view
+    GR = reshape(greens_estimator.GR, (Lτ, Nsites, Nrv))
+    Rt = reshape(greens_estimator.Rt, (Lτ, Nsites, Nrv))
 
-    # get shifted view based on bond dispalcement
-    r = bond.displacement
-
-    # get the view based on the relevant orbitals species
-    GR_a = selectdim(GR, 2, a)
-    Rt_b = selectdim(Rt, 2, b)
-
-    # get the shifted view based on the bond displacement to represent
-    # cᵀ(i+r) <==> GR(j=i+r) and c(i+r) <==> Rt(j=i+r)
-    GR_a_r = ShiftedArrays.circshift(GR_a, (0, (-r[n] for n in 1:D)..., 0))
-    Rt_b_r = ShiftedArrays.circshift(Rt_b, (0, (-r[n] for n in 1:D)..., 0))
-
-    # iterate over unit cells
-    for i in CartesianIndices(L)
-        # get the relevant hopping energy
-        ti = t″[i]
-        # get the relevant views
-        GR_a_i = @view GR_a[:, i, :]
-        Rt_b_i = @view Rt_b[:, i, :]
-        GR_a_r_i = @view GR_a_r[:, i, :]
-        Rt_b_r_i = @view Rt_b_r[:, i, :]
-        # calculate hopping energy of current unit cell
-        # h =  t⋅cᵀ(i+r)⋅c(i)  + tᵀ⋅cᵀ(i)⋅c(i+r)
-        #   = -t⋅c(i)⋅cᵀ(i+r)  - tᵀ⋅c(i+r)⋅cᵀ(i)
-        #   ≈ -t⋅GR(i)⋅Rt(i+r) - tᵀ⋅GR(i+r)⋅Rt(i)
-        h += sum(
-            -ti * GR_a_i[n] * Rt_b_r_i[n] - conj(ti) * GR_a_r_i[n] * Rt_b_i[n]
-            for n in eachindex(Rt_b_i) # iterates of imaginary-time slices and random vectors
-        ) / (Lτ * Nrv)
+    # iterate over random vector
+    @inbounds for rv in 1:Nrv
+        # iterate over hoppings
+        for m in 1:N
+            # get the pair of sites connected by the hopping
+            i = neighbor_table[1,m] # initial site
+            f = neighbor_table[2,m] # final site
+            # get the hopping amplitude
+            t_if = t[m]
+            # iterate over imaginary-time slice
+            for l in 1:Lτ
+                # calculate hopping energy of current unit cell
+                # h = -t⋅cᵀ(i+r)⋅c(i)  - tᵀ⋅cᵀ(i)⋅c(i+r)
+                #   = +t⋅c(i)⋅cᵀ(i+r)  + tᵀ⋅c(i+r)⋅cᵀ(i)
+                #   ≈ +t⋅GR(i)⋅Rt(i+r) + tᵀ⋅GR(i+r)⋅Rt(i)
+                a = t_if * GR[l,i,rv] * Rt[l,f,rv]
+                b = conj(t_if) * GR[l,f,rv] * Rt[l,i,rv]
+                h += a + b
+            end
+        end
     end
 
     # normalize hopping energy measurement
-    h /= N
+    h /= (Lτ * Nsites * Nrv)
 
     return h
 end
@@ -174,62 +160,50 @@ function measure_hopping_energy(
     hopping_id::Int
 ) where {D, T<:Number, E<:AbstractFloat}
 
-    (; GR, Rt, N, L, n, Lτ, Nrv) = greens_estimator
-    (; neighbor_table, bond_slices, bond_ids) = tight_binding_parameters
-    (; t) = fermion_path_integral
+    (; N, n, Lτ, Nrv) = greens_estimator
+    (; bond_slices) = tight_binding_parameters
 
     # initialize hopping energy to zero
     h = zero(Complex{E})
 
-    # get bond ID associated with hopping ID
-    bond_id = bond_ids[hopping_id]
+    # get the hopping associated with the hopping id
+    t = @view fermion_path_integral.t[bond_slices[hopping_id],:]
 
-    # get the relevant bond
-    bond = model_geometry.bonds[bond_id]
+    # get the neighbor table associated with the hopping id
+    neighbor_table = @view tight_binding_parameters.neighbor_table[:,bond_slices[hopping_id]]
 
-    # get the hopping associated with the bond/hopping in question
-    t′ = @view t[bond_slices[hopping_id], :]
-    t″ = reshape(t′, L..., Lτ)
+    # total number of sites in lattice given that N is number of unit cells
+    # and n is the number of orbitals per unit cell
+    Nsites = N * n
 
-    # get the relevant orbital species
-    b, a = bond.orbitals
+    # get random vector view
+    GR = reshape(greens_estimator.GR, (Lτ, Nsites, Nrv))
+    Rt = reshape(greens_estimator.Rt, (Lτ, Nsites, Nrv))
 
-    # get shifted view based on bond dispalcement
-    r = bond.displacement
-
-    # get the view based on the relevant orbitals species
-    GR_a = selectdim(GR, 2, a)
-    Rt_b = selectdim(Rt, 2, b)
-
-    # get the shifted view based on the bond displacement to represent
-    # cᵀ(i+r) <==> GR(j=i+r) and c(i+r) <==> Rt(j=i+r)
-    GR_a_r = ShiftedArrays.circshift(GR_a, (0, (-r[n] for n in 1:D)..., 0))
-    Rt_b_r = ShiftedArrays.circshift(Rt_b, (0, (-r[n] for n in 1:D)..., 0))
-
-    # iterate over unit cells
-    for i in CartesianIndices(L)
-        # get the relevant hopping energy
-        ti = @view t″[i, :]
-        # get the relevant views
-        GR_a_i = @view GR_a[:, i, :]
-        Rt_b_i = @view Rt_b[:, i, :]
-        GR_a_r_i = @view GR_a_r[:, i, :]
-        Rt_b_r_i = @view Rt_b_r[:, i, :]
-        # iterate over random vectors
-        for rv in 1:Nrv
-            # calculate hopping energy of current unit cell
-            # h =  t⋅cᵀ(i+r)⋅c(i)  + tᵀ⋅cᵀ(i)⋅c(i+r)
-            #   = -t⋅c(i)⋅cᵀ(i+r)  - tᵀ⋅c(i+r)⋅cᵀ(i)
-            #   ≈ -t⋅GR(i)⋅Rt(i+r) - tᵀ⋅GR(i+r)⋅Rt(i)
-            h += sum(
-                -ti[l] * GR_a_i[l, rv] * Rt_b_r_i[l, rv] - conj(ti[l]) * GR_a_r_i[l, rv] * Rt_b_i[l, rv]
-                for l in eachindex(ti) # iterates of imaginary-time slices
-            ) / (Lτ * Nrv)
+    # iterate over random vector
+    @inbounds for rv in 1:Nrv
+        # iterate over hoppings
+        for m in 1:N
+            # get the pair of sites connected by the hopping
+            i = neighbor_table[1,m] # initial site
+            f = neighbor_table[2,m] # final site
+            # iterate over imaginary-time slice
+            for l in 1:Lτ
+                # get the hopping amplitude
+                t_if = t[m,l]
+                # calculate hopping energy of current unit cell
+                # h = -t⋅cᵀ(i+r)⋅c(i)  - tᵀ⋅cᵀ(i)⋅c(i+r)
+                #   = +t⋅c(i)⋅cᵀ(i+r)  + tᵀ⋅c(i+r)⋅cᵀ(i)
+                #   ≈ +t⋅GR(i)⋅Rt(i+r) + tᵀ⋅GR(i+r)⋅Rt(i)
+                a = t_if * GR[l,i,rv] * Rt[l,f,rv]
+                b = conj(t_if) * GR[l,f,rv] * Rt[l,i,rv]
+                h += a + b
+            end
         end
     end
 
     # normalize hopping energy measurement
-    h /= N
+    h /= (Lτ * Nsites * Nrv)
 
     return h
 end

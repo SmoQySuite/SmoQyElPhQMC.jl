@@ -29,7 +29,7 @@ function mul_νRe∂M∂x!(
     # v′[l] = -v′[l] = -v[l-1] for l>1
     @views @. v′[2:end,:] = -v′[2:end,:]
 
-    # caluculate v′[l] = exp(-Δτ⋅K[l]/2)ᵀ⋅v[l-1]
+    # calculate v′[l] = exp(-Δτ⋅K[l]/2)ᵀ⋅v[l-1]
     checkerboard_lmul!(v′, checkerboard_neighbor_table, coshΔτt, sinhΔτt, transposed = true)
 
     # calculate v′[l] = exp(-Δτ⋅V[l])⋅exp(-Δτ⋅K[l]/2)ᵀ⋅v[l-1]
@@ -144,7 +144,7 @@ function mul_νRe∂M∂x!(
     # v′[l] = -v′[l] = -v[l-1] for l>1
     @views @. v′[2:end,:] = -v′[2:end,:]
 
-    # caluculate v′[l] = exp(-Δτ⋅K[l])⋅v[l-1]
+    # calculate v′[l] = exp(-Δτ⋅K[l])⋅v[l-1]
     checkerboard_lmul!(v′, checkerboard_neighbor_table, coshΔτt, sinhΔτt, transposed = false)
 
     # calculate v′[l] = B[l]⋅v[l-1] = exp(-Δτ⋅V[l])⋅exp(-Δτ⋅K[l])⋅v[l-1]
@@ -223,6 +223,9 @@ function _mul_νReΔτ∂Kc∂x!(
                 # get the pair of phonons getting coupled
                 p  = coupling_to_phonon[1,c]
                 p′ = coupling_to_phonon[2,c]
+                # whether the mass is finite for the two phonon modes
+                finite_mass_p  = isfinite(M[p])
+                finite_mass_p′ = isfinite(M[p′])
                 # get the pair of orbitals that the coupled phonons live on
                 i = checkerboard_neighbor_table[1,n]
                 j = checkerboard_neighbor_table[2,n]
@@ -230,19 +233,17 @@ function _mul_νReΔτ∂Kc∂x!(
                 for l in axes(x,2)
                     # calculate relative phonon position (x′ - x)
                     Δx = x[p′,l] - x[p,l]
-                    # if mass of phonon p is finite
-                    if isfinite(M[p])
-                        # calculate Δτ⋅∂Kc/∂x[j,i]
-                        ΔτdKcdx_ji = Δτ * (-α[c] - 2*α2[c]*Δx - 3*α3[c]*Δx^2 - 4*α4[c]*Δx^3)
-                        # calculate ν⋅Re[⟨u′|Δτ⋅∂Kc/∂x|v′⟩]
-                        νRe∂M∂x[p,l] += ν * real( conj(u′[l,j]) * ΔτdKcdx_ji * v′[l,i] + conj(u′[l,i]) * conj(ΔτdKcdx_ji) * v′[l,j] )
+                    # calculate Δτ⋅∂Kc/∂x[j,i]
+                    ΔτdKcdx_ji = Δτ * (α[c] + 2*α2[c]*Δx + 3*α3[c]*Δx^2 + 4*α4[c]*Δx^3)
+                    # calculate ν⋅Re[⟨u′|Δτ⋅∂Kc/∂x|v′⟩]
+                    val = ν * real( conj(u′[l,j]) * ΔτdKcdx_ji * v′[l,i] + conj(u′[l,i]) * conj(ΔτdKcdx_ji) * v′[l,j] )
+                    # record the derivative for phonon p if mass is finite
+                    if finite_mass_p
+                        νRe∂M∂x[p,l] -= val
                     end
-                    # if mass of phonon p′ is finite
-                    if isfinite(M[p′])
-                        # calculate Δτ⋅∂Kc/∂x′[j,i]
-                        ΔτdKcdx_ji = Δτ * (α[c] + 2*α2[c]*Δx + 3*α3[c]*Δx^2 + 4*α4[c]*Δx^3)
-                        # calculate ν⋅Re[⟨u′|Δτ⋅∂Kc/∂x|v′⟩]
-                        νRe∂M∂x[p′,l] += ν * real( conj(u′[l,j]) * ΔτdKcdx_ji * v′[l,i] + conj(u′[l,i]) * conj(ΔτdKcdx_ji) * v′[l,j] )
+                    # record the derivative for phonon p′ if mass is finite
+                    if finite_mass_p′
+                        νRe∂M∂x[p′,l] += val
                     end
                 end
             end
@@ -264,7 +265,7 @@ function _mul_νReΔτ∂V∂x!(
 
     (; β, Δτ, x, phonon_parameters) = elph
     holstein_parameters = elph.holstein_parameters_up
-    (; α, α2, α3, α4, coupling_to_phonon, neighbor_table, Nholstein) = holstein_parameters
+    (; α, α2, α3, α4, coupling_to_phonon, coupling_to_site, Nholstein) = holstein_parameters
     (; M) = phonon_parameters
 
     # iterate over holstein couplings
@@ -272,7 +273,7 @@ function _mul_νReΔτ∂V∂x!(
         # get the phonon associated with the coupling
         p = coupling_to_phonon[c]
         # get the orbital whose density is getting coupled to
-        i = neighbor_table[2,c]
+        i = coupling_to_site[c]
         # if phonon mass is finite
         if isfinite(M[p])
             # iterate over imaginary time slice

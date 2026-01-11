@@ -7,16 +7,66 @@ function measure_current_correlation!(
     coef::T = 1.0
 ) where {Dp1, D, E<:AbstractFloat, T<:Number}
 
-    # measure equal-spin current correlation
-    measure_current_correlation!(
+    b, a = b′.orbitals
+    r′ = b′.displacement
+    d, c = b″.orbitals
+    r″ = b″.displacement
+    z = @SVector zeros(Int, D)
+
+    # CC(τ,r) = +t(b,i+r,τ|a,i+r+r′,τ)⋅t(c,i+r″,0|d,i,0)⋅Gσ′(a,i+r+r′,τ|b,i+r,τ)⋅Gσ″(d,i,0|c,i+r″,0)
+    measure_GΔΔ_G00!(
         CC, greens_estimator,
-        b′, b″, t′, t″, +1, +1, 2.0*coef
+        (a, b, d, c), r′, z, z, r″,
+        +4.0*coef, t′, t″, true, false
     )
 
-    # measure unequal-spin current correlation
-    measure_current_correlation!(
+    # CC(τ,r) += -t(b,i+r,τ|a,i+r+r′,τ)⋅t(d,i,0|c,i+r″,0)⋅Gσ′(a,i+r+r′,τ|b,i+r,τ)⋅Gσ″(c,i+r″,0|d,i,0)
+    measure_GΔΔ_G00!(
         CC, greens_estimator,
-        b′, b″, t′, t″, +1, -1, 2.0*coef
+        (a, b, c, d), r′, z, r″, z,
+        -4.0*coef, t′, t″, true, true
+    )
+
+    # CC(τ,r) += -t(a,i+r+r′,τ|b,i+r,τ)⋅t(c,i+r″,0|d,i,0)⋅Gσ′(b,i+r,τ|a,i+r+r′,τ)⋅Gσ″(d,i,0|c,i+r″,0)
+    measure_GΔΔ_G00!(
+        CC, greens_estimator,
+        (b, a, d, c), z, r′, z, r″,
+        -4.0*coef, t′, t″, false, false
+    )
+
+    # CC(τ,r) += +t(a,i+r+r′,τ|b,i+r,τ)⋅t(d,i,0|c,i+r″,0)⋅Gσ′(b,i+r,τ|a,i+r+r′,τ)⋅Gσ″(c,i+r″,0|d,i,0)
+    measure_GΔΔ_G00!(
+        CC, greens_estimator,
+        (b, a, c, d), z, r′, r″, z,
+        +4.0*coef, t′, t″, false, true
+    )
+
+    # CC(τ,r) += -δ(σ′,σ″)⋅t(b,i+r,τ|a,i+r+r′,τ)⋅t(c,i+r″,0|d,i,0)⋅Gσ′(d,i,0|b,i+r,τ)⋅Gσ′(a,i+r+r′,τ|c+i+r″,0)
+    measure_G0Δ_GΔ0!(
+        CC, greens_estimator,
+        (b, a, c, d), z, z, r′, r″,
+        -2.0*coef, t′, t″, true, false
+    )
+
+    # CC(τ,r) += +δ(σ′,σ″)⋅t(b,i+r,τ|a,i+r+r′,τ)⋅t(d,i,0|c,i+r″,0)⋅Gσ′(c,i+r″,0|b,i+r,τ)⋅Gσ′(a,i+r+r′,τ|d,i,0)
+    measure_G0Δ_GΔ0!(
+        CC, greens_estimator,
+        (b, a, d, c), r″, z, r′, z,
+        +2.0*coef, t′, t″, true, true
+    )
+
+    # CC(τ,r) += +δ(σ′,σ″)⋅t(a,i+r+r′,τ|b,i+r,τ)⋅t(c,i+r″,0|d,i,0)⋅Gσ′(d,i,0|a,i+r+r′,τ)⋅Gσ′(b,i+r,τ|c,i+r″,0)
+    measure_G0Δ_GΔ0!(
+        CC, greens_estimator,
+        (d, a, b, c), z, r′, z, r″,
+        +2.0*coef, t′, t″, false, false
+    )
+
+    # CC(τ,r) += -δ(σ′,σ″)⋅t(a,i+r+r′,τ|b,i+r,τ)⋅t(d,i,0|c,i+r″,0)⋅Gσ′(c,i+r″,0|a,i+r+r′,τ)⋅Gσ′(b,i+r,τ|d,i,0)
+    measure_G0Δ_GΔ0!(
+        CC, greens_estimator,
+        (c, a, b, d), r″, r′, z, z,
+        -2.0*coef, t′, t″, false, true
     )
 
     return nothing
