@@ -27,7 +27,7 @@ reshaped(a::AbstractArray, dims::NTuple{N,Int}) where {N} = Base.ReshapedArray(a
 #     return reshaped(a, dims)
 # end
 
-# import function for calculating checkerboard decomosition
+# import function for calculating checkerboard decomposition
 import Checkerboard: checkerboard_decomposition!
 
 # for representing checkerboard matrix

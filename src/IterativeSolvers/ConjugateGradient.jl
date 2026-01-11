@@ -7,7 +7,7 @@
 # # FIELDS
 
 # - `maxiter::Int`: Max number of allowed CG iterations.
-# - `tol::E`: CG tolerance theshold.
+# - `tol::E`: CG tolerance threshold.
 # - `N::Int`: Size of the linear system solver is intended to solve.
 # - `r::Vector{T}`: Vector to avoid temporary memory allocations.
 # - `p::Vector{T}`: Vector to avoid temporary memory allocations.
@@ -41,7 +41,7 @@ end
 # # KEYWORD ARGUMENTS
 
 # - `maxiter::Int`: Max number of allowed CG iterations.
-# - `tol::E = 1e-8`: CG tolerance theshold.
+# - `tol::E = 1e-8`: CG tolerance threshold.
 # """
 function ConjugateGradientSolver(
     # ARGUMENTS

@@ -1,7 +1,7 @@
 @doc raw"""
     PFFCalculator{T<:AbstractFloat}
 
-The `PFFCalaculatr` type, short for pseudo-fermion field calcutor, is for facilitating the
+The `PFFCalculator` type, short for pseudo-fermion field calculator, is for facilitating the
 sampling the pseudo-fermion fields ``\Phi``, evaluate the fermionic
 action ``S_f`` and calculating it's partial derivatives ``\partial S_f/\partial x_{\tau,i}`` with
 respect to each phonon field ``x_{\tau,i}.``
@@ -107,7 +107,9 @@ function calculate_fermionic_action!(
     ldiv_Λ!(Ψ, Λ, Ψ)
     # Sf = Φᵀ⋅Ψ = Φᵀ⋅[Aᵀ⋅A]⁻¹⋅Φ
     Sf = dot(Φ,Ψ)
-    @warn sqrt(tol) < abs(imag(Sf)/real(Sf)) "Complex Fermionic Action Encountered, Sf = $Sf"
+    if sqrt(tol) < abs(imag(Sf)/real(Sf))
+        @warn "Complex Fermionic Action Encountered, Sf = $Sf"
+    end
     Sf = real(Sf)
 
     return Sf, iters, ϵ
