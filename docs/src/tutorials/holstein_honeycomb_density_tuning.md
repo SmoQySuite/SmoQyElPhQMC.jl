@@ -1,16 +1,23 @@
-# # 1d) Honeycomb Holstein Model with Density Tuning
-# In this example we demonstrate how to introduce chemical potential and density tuning to the previous
-# [1c) Honeycomb Holstein Model with Checkpointing](@ref) tutorial.
-# Specifically, we show how to use the algorithm introduced in
-# [Phys. Rev. E 105, 045311](https://journals.aps.org/pre/abstract/10.1103/PhysRevE.105.045311)
-# for dynamically adjusting the chemical potential during the simulation in order to achieve a target
-# electron density or filling fraction.
+```@meta
+EditURL = "../../../tutorials/holstein_honeycomb_density_tuning.jl"
+```
 
-# ## Import Packages
-# Compared to the previous [1c) Honeycomb Holstein Model with Checkpointing](@ref) tutorial,
-# we now need to import the [MuTuner.jl](https://github.com/cohensbw/MuTuner.jl.git)
-# package, which is reexported by [SmoQyDQMC.jl](https://github.com/SmoQySuite/SmoQyDQMC.jl.git)
+Download this example as a [Julia script](../assets/scripts/tutorials/holstein_honeycomb_density_tuning.jl).
 
+# 1d) Honeycomb Holstein Model with Density Tuning
+In this example we demonstrate how to introduce chemical potential and density tuning to the previous
+[1c) Honeycomb Holstein Model with Checkpointing](@ref) tutorial.
+Specifically, we show how to use the algorithm introduced in
+[Phys. Rev. E 105, 045311](https://journals.aps.org/pre/abstract/10.1103/PhysRevE.105.045311)
+for dynamically adjusting the chemical potential during the simulation in order to achieve a target
+electron density or filling fraction.
+
+## Import Packages
+Compared to the previous [1c) Honeycomb Holstein Model with Checkpointing](@ref) tutorial,
+we now need to import the [MuTuner.jl](https://github.com/cohensbw/MuTuner.jl.git)
+package, which is reexported by [SmoQyDQMC.jl](https://github.com/SmoQySuite/SmoQyDQMC.jl.git)
+
+````julia
 using SmoQyElPhQMC
 using SmoQyDQMC
 import SmoQyDQMC.LatticeUtilities as lu
@@ -19,17 +26,19 @@ import SmoQyDQMC.MuTuner as mt
 using Random
 using Printf
 using MPI
+````
 
-# ## Specify simulation parameters
-# Here we introduce the keyword argument `n` to the `run_simulation` function
-# which specifies the target electron density we want to achieve in the simulation.
-# Now the `μ` argument specifies the initial chemical potential we begin the simulation with,
-# but of course it will be adjusted during the simulation to achieve the target density `n`.
+## Specify simulation parameters
+Here we introduce the keyword argument `n` to the `run_simulation` function
+which specifies the target electron density we want to achieve in the simulation.
+Now the `μ` argument specifies the initial chemical potential we begin the simulation with,
+but of course it will be adjusted during the simulation to achieve the target density `n`.
 
-## Top-level function to run simulation.
+````julia
+# Top-level function to run simulation.
 function run_simulation(
     comm::MPI.Comm; # MPI communicator.
-    ## KEYWORD ARGUMENTS
+    # KEYWORD ARGUMENTS
     sID, # Simulation ID.
     Ω, # Phonon energy.
     α, # Electron-phonon coupling.
@@ -51,58 +60,62 @@ function run_simulation(
     seed = abs(rand(Int)), # Seed for random number generator.
     filepath = "." # Filepath to where data folder will be created.
 )
+````
 
-# ## Initialize simulation
-# No changes need to made to this section of the code from the previous
-# [1c) Honeycomb Holstein Model with Checkpointing](@ref) tutorial.
+## Initialize simulation
+No changes need to made to this section of the code from the previous
+[1c) Honeycomb Holstein Model with Checkpointing](@ref) tutorial.
 
-    ## Record when the simulation began.
+````julia
+    # Record when the simulation began.
     start_timestamp = time()
 
-    ## Convert runtime limit from hours to seconds.
+    # Convert runtime limit from hours to seconds.
     runtime_limit = runtime_limit * 60.0^2
 
-    ## Convert checkpoint frequency from hours to seconds.
+    # Convert checkpoint frequency from hours to seconds.
     checkpoint_freq = checkpoint_freq * 60.0^2
 
-    ## Construct the foldername the data will be written to.
+    # Construct the foldername the data will be written to.
     datafolder_prefix = @sprintf "holstein_honeycomb_w%.2f_a%.2f_n%.2f_L%d_b%.2f" Ω α n L β
 
-    ## Get MPI process ID.
+    # Get MPI process ID.
     pID = MPI.Comm_rank(comm)
 
-    ## Initialize simulation info.
+    # Initialize simulation info.
     simulation_info = SimulationInfo(
-        filepath = filepath,                     
+        filepath = filepath,
         datafolder_prefix = datafolder_prefix,
         write_bins_concurrent = write_bins_concurrent,
         sID = sID,
         pID = pID
     )
 
-    ## Initialize the directory the data will be written to.
+    # Initialize the directory the data will be written to.
     initialize_datafolder(comm, simulation_info)
+````
 
-# ## Initialize simulation metadata
-# Here it is useful to record the initial chemical potential `μ` used during the simulation
-# in the metadata dictionary.
+## Initialize simulation metadata
+Here it is useful to record the initial chemical potential `μ` used during the simulation
+in the metadata dictionary.
 
-    ## If starting a new simulation i.e. not resuming a previous simulation.
+````julia
+    # If starting a new simulation i.e. not resuming a previous simulation.
     if !simulation_info.resuming
 
-        ## Begin thermalization updates from start.
+        # Begin thermalization updates from start.
         n_therm = 1
 
-        ## Begin measurement updates from start.
+        # Begin measurement updates from start.
         n_updates = 1
 
-        ## Initialize random number generator
+        # Initialize random number generator
         rng = Xoshiro(seed)
 
-        ## Initialize metadata dictionary
+        # Initialize metadata dictionary
         metadata = Dict()
 
-        ## Record simulation parameters.
+        # Record simulation parameters.
         metadata["N_therm"] = N_therm  # Number of thermalization updates
         metadata["N_updates"] = N_updates  # Total number of measurements and measurement updates
         metadata["N_bins"] = N_bins # Number of times bin-averaged measurements are written to file
@@ -118,57 +131,59 @@ function run_simulation(
         metadata["reflection_iters"] = 0.0 # Avg number of CG iterations per solve in reflection update.
         metadata["swap_iters"] = 0.0 # Avg number of CG iterations per solve in swap update.
         metadata["measurement_iters"] = 0.0 # Avg number of CG iterations per solve while making measurements.
+````
 
-# ## Initialize model
-# No changes need to made to this section of the code from the previous
-# [1c) Honeycomb Holstein Model with Checkpointing](@ref) tutorial.
+## Initialize model
+No changes need to made to this section of the code from the previous
+[1c) Honeycomb Holstein Model with Checkpointing](@ref) tutorial.
 
-        ## Define lattice vectors.
+````julia
+        # Define lattice vectors.
         a1 = [+3/2, +√3/2]
         a2 = [+3/2, -√3/2]
 
-        ## Define basis vectors for two orbitals in the honeycomb unit cell.
+        # Define basis vectors for two orbitals in the honeycomb unit cell.
         r1 = [0.0, 0.0] # Location of first orbital in unit cell.
         r2 = [1.0, 0.0] # Location of second orbital in unit cell.
 
-        ## Define the unit cell.
+        # Define the unit cell.
         unit_cell = lu.UnitCell(
             lattice_vecs = [a1, a2],
             basis_vecs   = [r1, r2]
         )
 
-        ## Define finite lattice with periodic boundary conditions.
+        # Define finite lattice with periodic boundary conditions.
         lattice = lu.Lattice(
             L = [L, L],
             periodic = [true, true]
         )
 
-        ## Initialize model geometry.
+        # Initialize model geometry.
         model_geometry = ModelGeometry(unit_cell, lattice)
 
-        ## Define the first nearest-neighbor bond in a honeycomb lattice.
+        # Define the first nearest-neighbor bond in a honeycomb lattice.
         bond_1 = lu.Bond(orbitals = (1,2), displacement = [0,0])
 
-        ## Add the first nearest-neighbor bond in a honeycomb lattice to the model.
+        # Add the first nearest-neighbor bond in a honeycomb lattice to the model.
         bond_1_id = add_bond!(model_geometry, bond_1)
 
-        ## Define the second nearest-neighbor bond in a honeycomb lattice.
+        # Define the second nearest-neighbor bond in a honeycomb lattice.
         bond_2 = lu.Bond(orbitals = (1,2), displacement = [-1,0])
 
-        ## Add the second nearest-neighbor bond in a honeycomb lattice to the model.
+        # Add the second nearest-neighbor bond in a honeycomb lattice to the model.
         bond_2_id = add_bond!(model_geometry, bond_2)
 
-        ## Define the third nearest-neighbor bond in a honeycomb lattice.
+        # Define the third nearest-neighbor bond in a honeycomb lattice.
         bond_3 = lu.Bond(orbitals = (1,2), displacement = [0,-1])
 
-        ## Add the third nearest-neighbor bond in a honeycomb lattice to the model.
+        # Add the third nearest-neighbor bond in a honeycomb lattice to the model.
         bond_3_id = add_bond!(model_geometry, bond_3)
 
-        ## Set nearest-neighbor hopping amplitude to unity,
-        ## setting the energy scale in the model.
+        # Set nearest-neighbor hopping amplitude to unity,
+        # setting the energy scale in the model.
         t = 1.0
 
-        ## Define the honeycomb tight-binding model.
+        # Define the honeycomb tight-binding model.
         tight_binding_model = TightBindingModel(
             model_geometry = model_geometry,
             t_bonds        = [bond_1, bond_2, bond_3], # defines hopping
@@ -177,37 +192,37 @@ function run_simulation(
             ϵ_mean         = [0.0, 0.0] # set the (mean) on-site energy
         )
 
-        ## Initialize a null electron-phonon model.
+        # Initialize a null electron-phonon model.
         electron_phonon_model = ElectronPhononModel(
             model_geometry = model_geometry,
             tight_binding_model = tight_binding_model
         )
 
-        ## Define a dispersionless electron-phonon mode to live on each site in the lattice.
+        # Define a dispersionless electron-phonon mode to live on each site in the lattice.
         phonon_1 = PhononMode(
             basis_vec = r1,
             Ω_mean = Ω
         )
 
-        ## Add the phonon mode definition to the electron-phonon model.
+        # Add the phonon mode definition to the electron-phonon model.
         phonon_1_id = add_phonon_mode!(
             electron_phonon_model = electron_phonon_model,
             phonon_mode = phonon_1
         )
 
-        ## Define a dispersionless electron-phonon mode to live on the second sublattice.
+        # Define a dispersionless electron-phonon mode to live on the second sublattice.
         phonon_2 = PhononMode(
             basis_vec = r2,
             Ω_mean = Ω
         )
 
-        ## Add the phonon mode definition to the electron-phonon model.
+        # Add the phonon mode definition to the electron-phonon model.
         phonon_2_id = add_phonon_mode!(
             electron_phonon_model = electron_phonon_model,
             phonon_mode = phonon_2
         )
 
-        ## Define first local Holstein coupling for first phonon mode.
+        # Define first local Holstein coupling for first phonon mode.
         holstein_coupling_1 = HolsteinCoupling(
             model_geometry = model_geometry,
             phonon_id = phonon_1_id,
@@ -217,14 +232,14 @@ function run_simulation(
             ph_sym_form = true,
         )
 
-        ## Add the first local Holstein coupling definition to the model.
+        # Add the first local Holstein coupling definition to the model.
         holstein_coupling_1_id = add_holstein_coupling!(
             electron_phonon_model = electron_phonon_model,
             holstein_coupling = holstein_coupling_1,
             model_geometry = model_geometry
         )
 
-        ## Define second local Holstein coupling for second phonon mode.
+        # Define second local Holstein coupling for second phonon mode.
         holstein_coupling_2 = HolsteinCoupling(
             model_geometry = model_geometry,
             phonon_id = phonon_2_id,
@@ -234,14 +249,14 @@ function run_simulation(
             ph_sym_form = true,
         )
 
-        ## Add the second local Holstein coupling definition to the model.
+        # Add the second local Holstein coupling definition to the model.
         holstein_coupling_2_id = add_holstein_coupling!(
             electron_phonon_model = electron_phonon_model,
             holstein_coupling = holstein_coupling_2,
             model_geometry = model_geometry
         )
 
-        ## Write model summary TOML file specifying Hamiltonian that will be simulated.
+        # Write model summary TOML file specifying Hamiltonian that will be simulated.
         model_summary(
             simulation_info = simulation_info,
             β = β, Δτ = Δτ,
@@ -249,24 +264,26 @@ function run_simulation(
             tight_binding_model = tight_binding_model,
             interactions = (electron_phonon_model,)
         )
+````
 
-# ## Initialize model parameters
-# In this section we need to make use of the [MuTuner.jl](https://github.com/cohensbw/MuTuner.jl.git)
-# package, initializing an instance of the
-# [`MuTuner.MuTunerLogger`](https://cohensbw.github.io/MuTuner.jl/stable/api/)
-# type using the
-# [`MuTuner.init_mutunerlogger`](https://cohensbw.github.io/MuTuner.jl/stable/api/)
-# function. Note that we use the [`LatticeUtilities.nsites`](@extref)
-# function to calculate the total number of orbitals in our system.
+## Initialize model parameters
+In this section we need to make use of the [MuTuner.jl](https://github.com/cohensbw/MuTuner.jl.git)
+package, initializing an instance of the
+[`MuTuner.MuTunerLogger`](https://cohensbw.github.io/MuTuner.jl/stable/api/)
+type using the
+[`MuTuner.init_mutunerlogger`](https://cohensbw.github.io/MuTuner.jl/stable/api/)
+function. Note that we use the [`LatticeUtilities.nsites`](@extref)
+function to calculate the total number of orbitals in our system.
 
-        ## Initialize tight-binding parameters.
+````julia
+        # Initialize tight-binding parameters.
         tight_binding_parameters = TightBindingParameters(
             tight_binding_model = tight_binding_model,
             model_geometry = model_geometry,
             rng = rng
         )
 
-        ## Initialize electron-phonon parameters.
+        # Initialize electron-phonon parameters.
         electron_phonon_parameters = ElectronPhononParameters(
             β = β, Δτ = Δτ,
             electron_phonon_model = electron_phonon_model,
@@ -275,8 +292,8 @@ function run_simulation(
             rng = rng
         )
 
-        ## Initialize MuTunerLogger type that will be used to dynamically adjust the
-        ## chemicaml potential during the simulation.
+        # Initialize MuTunerLogger type that will be used to dynamically adjust the
+        # chemicaml potential during the simulation.
         chemical_potential_tuner = mt.init_mutunerlogger(
             target_density = n,
             inverse_temperature = β,
@@ -284,45 +301,47 @@ function run_simulation(
             initial_chemical_potential = μ,
             complex_sign_problem = false
         )
+````
 
-# ## Initialize measurements
-# No changes need to made to this section of the code from the previous
-# [1c) Honeycomb Holstein Model with Checkpointing](@ref) tutorial.
+## Initialize measurements
+No changes need to made to this section of the code from the previous
+[1c) Honeycomb Holstein Model with Checkpointing](@ref) tutorial.
 
-        ## Initialize the container that measurements will be accumulated into.
+````julia
+        # Initialize the container that measurements will be accumulated into.
         measurement_container = initialize_measurement_container(model_geometry, β, Δτ)
 
-        ## Initialize the tight-binding model related measurements, like the hopping energy.
+        # Initialize the tight-binding model related measurements, like the hopping energy.
         initialize_measurements!(measurement_container, tight_binding_model)
 
-        ## Initialize the electron-phonon interaction related measurements.
+        # Initialize the electron-phonon interaction related measurements.
         initialize_measurements!(measurement_container, electron_phonon_model)
 
-        ## Initialize the single-particle electron Green's function measurement.
+        # Initialize the single-particle electron Green's function measurement.
         initialize_correlation_measurements!(
             measurement_container = measurement_container,
             model_geometry = model_geometry,
             correlation = "greens",
             time_displaced = true,
             pairs = [
-                ## Measure green's functions for all pairs or orbitals.
+                # Measure green's functions for all pairs or orbitals.
                 (1, 1), (2, 2), (1, 2)
             ]
         )
 
-        ## Initialize the single-particle electron Green's function measurement.
+        # Initialize the single-particle electron Green's function measurement.
         initialize_correlation_measurements!(
             measurement_container = measurement_container,
             model_geometry = model_geometry,
             correlation = "phonon_greens",
             time_displaced = true,
             pairs = [
-                ## Measure green's functions for all pairs of modes.
+                # Measure green's functions for all pairs of modes.
                 (1, 1), (2, 2), (1, 2)
             ]
         )
 
-        ## Initialize density correlation function measurement.
+        # Initialize density correlation function measurement.
         initialize_correlation_measurements!(
             measurement_container = measurement_container,
             model_geometry = model_geometry,
@@ -334,7 +353,7 @@ function run_simulation(
             ]
         )
 
-        ## Initialize the pair correlation function measurement.
+        # Initialize the pair correlation function measurement.
         initialize_correlation_measurements!(
             measurement_container = measurement_container,
             model_geometry = model_geometry,
@@ -342,13 +361,13 @@ function run_simulation(
             time_displaced = false,
             integrated = true,
             pairs = [
-                ## Measure local s-wave pair susceptibility associated with
-                ## each orbital in the unit cell.
+                # Measure local s-wave pair susceptibility associated with
+                # each orbital in the unit cell.
                 (1, 1), (2, 2)
             ]
         )
 
-        ## Initialize the spin-z correlation function measurement.
+        # Initialize the spin-z correlation function measurement.
         initialize_correlation_measurements!(
             measurement_container = measurement_container,
             model_geometry = model_geometry,
@@ -360,8 +379,8 @@ function run_simulation(
             ]
         )
 
-        ## Initialize measurement of electron Green's function traced
-        ## over both orbitals in the unit cell.
+        # Initialize measurement of electron Green's function traced
+        # over both orbitals in the unit cell.
         initialize_composite_correlation_measurement!(
             measurement_container = measurement_container,
             model_geometry = model_geometry,
@@ -372,7 +391,7 @@ function run_simulation(
             time_displaced = true,
         )
 
-        ## Initialize CDW correlation measurement.
+        # Initialize CDW correlation measurement.
         initialize_composite_correlation_measurement!(
             measurement_container = measurement_container,
             model_geometry = model_geometry,
@@ -383,36 +402,40 @@ function run_simulation(
             time_displaced = false,
             integrated = true
         )
+````
 
-# ## Write first checkpoint
-# Here we need to add the
-# [`MuTuner.MuTunerLogger`](https://cohensbw.github.io/MuTuner.jl/stable/api/)
-# instance `chemical_potential_tuner` to the checkpoint file.
+## Write first checkpoint
+Here we need to add the
+[`MuTuner.MuTunerLogger`](https://cohensbw.github.io/MuTuner.jl/stable/api/)
+instance `chemical_potential_tuner` to the checkpoint file.
 
-        ## Write initial checkpoint file.
+````julia
+        # Write initial checkpoint file.
         checkpoint_timestamp = write_jld2_checkpoint(
             comm,
             simulation_info;
             checkpoint_freq = checkpoint_freq,
             start_timestamp = start_timestamp,
             runtime_limit = runtime_limit,
-            ## Contents of checkpoint file below.
+            # Contents of checkpoint file below.
             n_therm, n_updates,
             tight_binding_parameters, electron_phonon_parameters, chemical_potential_tuner,
             measurement_container, model_geometry, metadata, rng
         )
+````
 
-# ## Load checkpoint
-# Here we need to make sure to load the [`MuTuner.MuTunerLogger`](https://cohensbw.github.io/MuTuner.jl/stable/api/)
-# instance `chemical_potential_tuner` from the checkpoint file.
+## Load checkpoint
+Here we need to make sure to load the [`MuTuner.MuTunerLogger`](https://cohensbw.github.io/MuTuner.jl/stable/api/)
+instance `chemical_potential_tuner` from the checkpoint file.
 
-    ## If resuming a previous simulation.
+````julia
+    # If resuming a previous simulation.
     else
 
-        ## Load the checkpoint file.
+        # Load the checkpoint file.
         checkpoint, checkpoint_timestamp = read_jld2_checkpoint(simulation_info)
 
-        ## Unpack contents of checkpoint dictionary.
+        # Unpack contents of checkpoint dictionary.
         tight_binding_parameters    = checkpoint["tight_binding_parameters"]
         electron_phonon_parameters  = checkpoint["electron_phonon_parameters"]
         chemical_potential_tuner    = checkpoint["chemical_potential_tuner"]
@@ -423,52 +446,58 @@ function run_simulation(
         n_therm                     = checkpoint["n_therm"]
         n_updates                   = checkpoint["n_updates"]
     end
+````
 
-# ## Setup DQMC simulation
-# No changes need to made to this section of the code from the previous
-# [1c) Honeycomb Holstein Model with Checkpointing](@ref) tutorial.
+## Setup DQMC simulation
+No changes need to made to this section of the code from the previous
+[1c) Honeycomb Holstein Model with Checkpointing](@ref) tutorial.
 
-    ## Allocate a single FermionPathIntegral for both spin-up and down electrons.
+````julia
+    # Allocate a single FermionPathIntegral for both spin-up and down electrons.
     fermion_path_integral = FermionPathIntegral(tight_binding_parameters = tight_binding_parameters, β = β, Δτ = Δτ)
 
-    ## Initialize FermionPathIntegral type to account for electron-phonon interaction.
+    # Initialize FermionPathIntegral type to account for electron-phonon interaction.
     initialize!(fermion_path_integral, electron_phonon_parameters)
 
-    ## Initialize fermion determinant matrix. Also set the default tolerance and max iteration count
-    ## used in conjugate gradient (CG) solves of linear systems involving this matrix.
+    # Initialize fermion determinant matrix. Also set the default tolerance and max iteration count
+    # used in conjugate gradient (CG) solves of linear systems involving this matrix.
     fermion_det_matrix = SymFermionDetMatrix(
         fermion_path_integral,
         maxiter = maxiter, tol = tol
     )
 
-    ## Initialize pseudofermion field calculator.
+    # Initialize pseudofermion field calculator.
     pff_calculator = PFFCalculator(electron_phonon_parameters, fermion_det_matrix)
 
-    ## Initialize KPM preconditioner.
+    # Initialize KPM preconditioner.
     preconditioner = KPMPreconditioner(fermion_det_matrix, rng = rng)
 
-    ## Initialize Green's function estimator for making measurements.
+    # Initialize Green's function estimator for making measurements.
     greens_estimator = GreensEstimator(fermion_det_matrix, model_geometry)
+````
 
-# ## Setup EFA-PFF-HMC Updates
-# No changes need to made to this section of the code from the previous
-# [1c) Honeycomb Holstein Model with Checkpointing](@ref) tutorial.
+## Setup EFA-PFF-HMC Updates
+No changes need to made to this section of the code from the previous
+[1c) Honeycomb Holstein Model with Checkpointing](@ref) tutorial.
 
-    ## Initialize Hamiltonian/Hybrid monte carlo (HMC) updater.
+````julia
+    # Initialize Hamiltonian/Hybrid monte carlo (HMC) updater.
     hmc_updater = EFAPFFHMCUpdater(
         electron_phonon_parameters = electron_phonon_parameters,
         Nt = Nt, Δt = π/(2*Nt)
     )
+````
 
-# ## Thermalize system
-# Here we need to add a call to the [`SmoQyDQMC.update_chemical_potential!`](@extref) function
-# after completing the updates but before writing the checkpoint file is written.
-# And again, we need to make sure the include the `chemical_potential_tuner` in the checkpoint file.
+## Thermalize system
+Here we need to add a call to the [`SmoQyDQMC.update_chemical_potential!`](@extref) function
+after completing the updates but before writing the checkpoint file is written.
+And again, we need to make sure the include the `chemical_potential_tuner` in the checkpoint file.
 
-    ## Iterate over number of thermalization updates to perform.
+````julia
+    # Iterate over number of thermalization updates to perform.
     for update in n_therm:N_therm
 
-        ## Perform a reflection update.
+        # Perform a reflection update.
         (accepted, iters) = reflection_update!(
             electron_phonon_parameters, pff_calculator,
             fermion_path_integral = fermion_path_integral,
@@ -477,13 +506,13 @@ function run_simulation(
             rng = rng, tol = tol, maxiter = maxiter
         )
 
-        ## Record whether the reflection update was accepted or rejected.
+        # Record whether the reflection update was accepted or rejected.
         metadata["reflection_acceptance_rate"] += accepted
 
-        ## Record the number of CG iterations performed for the reflection update.
+        # Record the number of CG iterations performed for the reflection update.
         metadata["reflection_iters"] += iters
 
-        ## Perform a swap update.
+        # Perform a swap update.
         (accepted, iters) = swap_update!(
             electron_phonon_parameters, pff_calculator,
             fermion_path_integral = fermion_path_integral,
@@ -492,13 +521,13 @@ function run_simulation(
             rng = rng, tol = tol, maxiter = maxiter
         )
 
-        ## Record whether the reflection update was accepted or rejected.
+        # Record whether the reflection update was accepted or rejected.
         metadata["swap_acceptance_rate"] += accepted
 
-        ## Record the number of CG iterations performed for the reflection update.
+        # Record the number of CG iterations performed for the reflection update.
         metadata["swap_iters"] += iters
 
-        ## Perform an HMC update.
+        # Perform an HMC update.
         (accepted, iters) = hmc_update!(
             electron_phonon_parameters, hmc_updater,
             fermion_path_integral = fermion_path_integral,
@@ -509,13 +538,13 @@ function run_simulation(
             rng = rng,
         )
 
-        ## Record the average number of iterations per CG solve for hmc update.
+        # Record the average number of iterations per CG solve for hmc update.
         metadata["hmc_acceptance_rate"] += accepted
 
-        ## Record the number of CG iterations performed for the reflection update.
+        # Record the number of CG iterations performed for the reflection update.
         metadata["hmc_iters"] += iters
 
-        ## Update the chemical potential to achieve the target density.
+        # Update the chemical potential to achieve the target density.
         update_chemical_potential!(
             fermion_det_matrix, greens_estimator;
             chemical_potential_tuner = chemical_potential_tuner,
@@ -525,7 +554,7 @@ function run_simulation(
             rng = rng, tol = tol, maxiter = maxiter
         )
 
-        ## Write checkpoint file.
+        # Write checkpoint file.
         checkpoint_timestamp = write_jld2_checkpoint(
             comm,
             simulation_info;
@@ -533,26 +562,28 @@ function run_simulation(
             checkpoint_freq = checkpoint_freq,
             start_timestamp = start_timestamp,
             runtime_limit = runtime_limit,
-            ## Contents of checkpoint file below.
+            # Contents of checkpoint file below.
             n_therm  = update + 1,
             n_updates = 1,
             tight_binding_parameters, electron_phonon_parameters, chemical_potential_tuner,
             measurement_container, model_geometry, metadata, rng
         )
     end
+````
 
-# ## Make measurements
-# Here we need to add a call to the [`SmoQyDQMC.update_chemical_potential!`](@extref) function
-# after making and writing measurements but before writing the checkpoint file is written.
-# And again, we need to make sure the include the `chemical_potential_tuner` in the checkpoint file.
+## Make measurements
+Here we need to add a call to the [`SmoQyDQMC.update_chemical_potential!`](@extref) function
+after making and writing measurements but before writing the checkpoint file is written.
+And again, we need to make sure the include the `chemical_potential_tuner` in the checkpoint file.
 
-    ## Calculate the bin size.
+````julia
+    # Calculate the bin size.
     bin_size = N_updates ÷ N_bins
 
-    ## Iterate over updates and measurements.
+    # Iterate over updates and measurements.
     for update in n_updates:N_updates
 
-        ## Perform a reflection update.
+        # Perform a reflection update.
         (accepted, iters) = reflection_update!(
             electron_phonon_parameters, pff_calculator,
             fermion_path_integral = fermion_path_integral,
@@ -561,13 +592,13 @@ function run_simulation(
             rng = rng, tol = tol, maxiter = maxiter
         )
 
-        ## Record whether the reflection update was accepted or rejected.
+        # Record whether the reflection update was accepted or rejected.
         metadata["reflection_acceptance_rate"] += accepted
 
-        ## Record the number of CG iterations performed for the reflection update.
+        # Record the number of CG iterations performed for the reflection update.
         metadata["reflection_iters"] += iters
 
-        ## Perform a swap update.
+        # Perform a swap update.
         (accepted, iters) = swap_update!(
             electron_phonon_parameters, pff_calculator,
             fermion_path_integral = fermion_path_integral,
@@ -576,13 +607,13 @@ function run_simulation(
             rng = rng, tol = tol, maxiter = maxiter
         )
 
-        ## Record whether the reflection update was accepted or rejected.
+        # Record whether the reflection update was accepted or rejected.
         metadata["swap_acceptance_rate"] += accepted
 
-        ## Record the number of CG iterations performed for the reflection update.
+        # Record the number of CG iterations performed for the reflection update.
         metadata["swap_iters"] += iters
 
-        ## Perform an HMC update.
+        # Perform an HMC update.
         (accepted, iters) = hmc_update!(
             electron_phonon_parameters, hmc_updater,
             fermion_path_integral = fermion_path_integral,
@@ -593,13 +624,13 @@ function run_simulation(
             rng = rng,
         )
 
-        ## Record the average number of iterations per CG solve for hmc update.
+        # Record the average number of iterations per CG solve for hmc update.
         metadata["hmc_acceptance_rate"] += accepted
 
-        ## Record the number of CG iterations performed for the reflection update.
+        # Record the number of CG iterations performed for the reflection update.
         metadata["hmc_iters"] += iters
 
-        ## Make measurements.
+        # Make measurements.
         iters = make_measurements!(
             measurement_container, fermion_det_matrix, greens_estimator,
             model_geometry = model_geometry,
@@ -611,10 +642,10 @@ function run_simulation(
             rng = rng
         )
 
-        ## Record the average number of iterations per CG solve for measurements.
+        # Record the average number of iterations per CG solve for measurements.
         metadata["measurement_iters"] += iters
 
-        ## Write the bin-averaged measurements to file if update ÷ bin_size == 0.
+        # Write the bin-averaged measurements to file if update ÷ bin_size == 0.
         write_measurements!(
             measurement_container = measurement_container,
             simulation_info = simulation_info,
@@ -624,7 +655,7 @@ function run_simulation(
             Δτ = Δτ
         )
 
-        ## Update the chemical potential to achieve the target density.
+        # Update the chemical potential to achieve the target density.
         update_chemical_potential!(
             fermion_det_matrix, greens_estimator;
             chemical_potential_tuner = chemical_potential_tuner,
@@ -634,7 +665,7 @@ function run_simulation(
             rng = rng, tol = tol, maxiter = maxiter
         )
 
-        ## Write checkpoint file.
+        # Write checkpoint file.
         checkpoint_timestamp = write_jld2_checkpoint(
             comm,
             simulation_info;
@@ -642,47 +673,53 @@ function run_simulation(
             checkpoint_freq = checkpoint_freq,
             start_timestamp = start_timestamp,
             runtime_limit = runtime_limit,
-            ## Contents of checkpoint file below.
+            # Contents of checkpoint file below.
             n_therm  = N_therm + 1,
             n_updates = update + 1,
             tight_binding_parameters, electron_phonon_parameters, chemical_potential_tuner,
             measurement_container, model_geometry, metadata, rng
         )
     end
+````
 
-# ## Merge binned data
-# No changes need to made to this section of the code from the previous [1a) Honeycomb Holstein Model](@ref) tutorial.
+## Merge binned data
+No changes need to made to this section of the code from the previous [1a) Honeycomb Holstein Model](@ref) tutorial.
 
-    ## Merge binned data into a single HDF5 file.
+````julia
+    # Merge binned data into a single HDF5 file.
     merge_bins(simulation_info)
+````
 
-# ## Record simulation metadata
-# Here we can add a call to the [`SmoQyDQMC.save_density_tuning_profile`](@extref), which records the full history
-# of the chemical potential and density tuning process.
+## Record simulation metadata
+Here we can add a call to the [`SmoQyDQMC.save_density_tuning_profile`](@extref), which records the full history
+of the chemical potential and density tuning process.
 
-    ## Calculate acceptance rates.
+````julia
+    # Calculate acceptance rates.
     metadata["hmc_acceptance_rate"] /= (N_updates + N_therm)
     metadata["reflection_acceptance_rate"] /= (N_updates + N_therm)
     metadata["swap_acceptance_rate"] /= (N_updates + N_therm)
 
-    ## Calculate average number of CG iterations.
+    # Calculate average number of CG iterations.
     metadata["hmc_iters"] /= (N_updates + N_therm)
     metadata["reflection_iters"] /= (N_updates + N_therm)
     metadata["swap_iters"] /= (N_updates + N_therm)
     metadata["measurement_iters"] /= N_updates
 
-    ## Write simulation metadata to simulation_info.toml file.
+    # Write simulation metadata to simulation_info.toml file.
     save_simulation_info(simulation_info, metadata)
 
-    ## Save the density tuning profile to file.
+    # Save the density tuning profile to file.
     save_density_tuning_profile(simulation_info, chemical_potential_tuner)
+````
 
-# ## Post-process results
-# No changes need to made to this section of the code from the previous
-# [1c) Honeycomb Holstein Model with Checkpointing](@ref) tutorial.
+## Post-process results
+No changes need to made to this section of the code from the previous
+[1c) Honeycomb Holstein Model with Checkpointing](@ref) tutorial.
 
-    ## Process the simulation results, calculating final error bars for all measurements.
-    ## writing final statistics to CSV files.
+````julia
+    # Process the simulation results, calculating final error bars for all measurements.
+    # writing final statistics to CSV files.
     process_measurements(
         comm,
         datafolder = simulation_info.datafolder,
@@ -693,7 +730,7 @@ function run_simulation(
         delimiter = " "
     )
 
-    ## Calculate CDW correlation ratio.
+    # Calculate CDW correlation ratio.
     Rcdw, ΔRcdw = compute_composite_correlation_ratio(
         datafolder = simulation_info.datafolder,
         name = "cdw",
@@ -705,15 +742,15 @@ function run_simulation(
         ]
     )
 
-    ## Record the AFM correlation ratio mean and standard deviation.
+    # Record the AFM correlation ratio mean and standard deviation.
     metadata["Rcdw_mean_real"] = real(Rcdw)
     metadata["Rcdw_mean_imag"] = imag(Rcdw)
     metadata["Rcdw_std"]       = ΔRcdw
 
-    ## Write simulation summary TOML file.
+    # Write simulation summary TOML file.
     save_simulation_info(simulation_info, metadata)
 
-    ## Rename the data folder to indicate the simulation is complete.
+    # Rename the data folder to indicate the simulation is complete.
     simulation_info = rename_complete_simulation(
         comm, simulation_info,
         delete_jld2_checkpoints = true
@@ -721,27 +758,29 @@ function run_simulation(
 
     return nothing
 end # end of run_simulation function
+````
 
-# ## Execute script
-# Here we add an additional command line argument to specify the target density `n` we want to achieve in the simulation.
-# Now the `μ` command line argument specifies the initial chemical potential we begin the simulation with.
-# For instance, a simulation can be run with the command
-# ```bash
-# mpiexecjl -n 16 julia holstein_honeycomb_density_tuning.jl 1 1.0 1.5 0.8 0.0 3 4.0 5000 10000 100 0.5
-# ```
-# or 
-# ```bash
-# srun julia holstein_honeycomb_density_tuning.jl 1 1.0 1.5 0.8 0.0 3 4.0 5000 10000 100 0.5
-# ```
-# where the target density is ``\langle n \rangle = 0.8`` and the initial chemical potential is ``\mu = 0.0``.
+## Execute script
+Here we add an additional command line argument to specify the target density `n` we want to achieve in the simulation.
+Now the `μ` command line argument specifies the initial chemical potential we begin the simulation with.
+For instance, a simulation can be run with the command
+```bash
+mpiexecjl -n 16 julia holstein_honeycomb_density_tuning.jl 1 1.0 1.5 0.8 0.0 3 4.0 5000 10000 100 0.5
+```
+or
+```bash
+srun julia holstein_honeycomb_density_tuning.jl 1 1.0 1.5 0.8 0.0 3 4.0 5000 10000 100 0.5
+```
+where the target density is ``\langle n \rangle = 0.8`` and the initial chemical potential is ``\mu = 0.0``.
 
-## Only execute if the script is run directly from the command line.
+````julia
+# Only execute if the script is run directly from the command line.
 if abspath(PROGRAM_FILE) == @__FILE__
 
-    ## Initialize MPI
+    # Initialize MPI
     MPI.Init()
 
-    ## Run the simulation.
+    # Run the simulation.
     run_simulation(
         MPI.COMM_WORLD;
         sID             = parse(Int,     ARGS[1]),  # Simulation ID.
@@ -757,3 +796,5 @@ if abspath(PROGRAM_FILE) == @__FILE__
         checkpoint_freq = parse(Float64, ARGS[11]), # Frequency with which checkpoint files are written in hours.
     )
 end
+````
+
