@@ -1,11 +1,11 @@
-# # 2c) Honeycomb Holstein Model with Checkpointing
+# # 1c) Honeycomb Holstein Model with Checkpointing
 # In this tutorial we demonstrate how to introduce checkpointing to the previous
-# [2b) Honeycomb Holstein Model with MPI Parallelization](@ref) tutorial, allowing for simulations to be
+# [1b) Honeycomb Holstein Model with MPI Parallelization](@ref) tutorial, allowing for simulations to be
 # resumed if terminated prior to completion.
 
 # ## Import packages
 # No changes need to made to this section of the code from the previous
-# [2b) Honeycomb Holstein Model with MPI Parallelization](@ref) tutorial.
+# [1b) Honeycomb Holstein Model with MPI Parallelization](@ref) tutorial.
 
 using SmoQyElPhQMC
 using SmoQyDQMC
@@ -16,7 +16,7 @@ using Printf
 using MPI
 
 # ## Specify simulation parameters
-# Compared to the previous [2b) Honeycomb Holstein Model with MPI Parallelization](@ref) tutorial, we have added
+# Compared to the previous [1b) Honeycomb Holstein Model with MPI Parallelization](@ref) tutorial, we have added
 # two new keyword arguments to the `run_simulation` function:
 # - `checkpoint_freq`: When going to write a new checkpoint file, only write one if more than `checkpoint_freq` hours have passed since the last checkpoint file was written.
 # - `runtime_limit`: If after writing a new checkpoint file more than `runtime_limit` hours have passed since the simulation started, terminate the simulation.
@@ -127,7 +127,7 @@ function run_simulation(
 
 # ## Initialize model
 # No changes need to made to this section of the code from the previous
-# [2b) Honeycomb Holstein Model with MPI Parallelization](@ref) tutorial.
+# [1b) Honeycomb Holstein Model with MPI Parallelization](@ref) tutorial.
 
         ## Define lattice vectors.
         a1 = [+3/2, +√3/2]
@@ -258,7 +258,7 @@ function run_simulation(
 
 # ## Initialize model parameters
 # No changes need to made to this section of the code from the previous
-# [2b) Honeycomb Holstein Model with MPI Parallelization](@ref) tutorial.
+# [1b) Honeycomb Holstein Model with MPI Parallelization](@ref) tutorial.
 
         ## Initialize tight-binding parameters.
         tight_binding_parameters = TightBindingParameters(
@@ -278,7 +278,7 @@ function run_simulation(
 
 # ## Initialize measurements
 # No changes need to made to this section of the code from the previous
-# [2b) Honeycomb Holstein Model with MPI Parallelization](@ref) tutorial.
+# [1b) Honeycomb Holstein Model with MPI Parallelization](@ref) tutorial.
 
         ## Initialize the container that measurements will be accumulated into.
         measurement_container = initialize_measurement_container(model_geometry, β, Δτ)
@@ -377,7 +377,7 @@ function run_simulation(
 
 # ## Write first checkpoint
 # This section of code needs to be added so that a first checkpoint file is written before
-# beginning a new simulation. We do this using the [`write_jld2_checkpoint`](@ref) function.
+# beginning a new simulation. We do this using the [`SmoQyDQMC.write_jld2_checkpoint`](@extref) function.
 # This function all return the epoch timestamp `checkpoint_timestamp` corresponding to when
 # the checkpoint file was written.
 
@@ -396,8 +396,8 @@ function run_simulation(
 
 # ## Load checkpoint
 # If we are resuming a simulation that was previously terminated prior to completion, then
-# we need to load the most recent checkpoint file using the [`read_jld2_checkpoint`](@ref) function.
-# The contents of the checkpoint file are returned as a dictionary `checkpoint` by the [`read_jld2_checkpoint`](@ref) function.
+# we need to load the most recent checkpoint file using the [`SmoQyDQMC.read_jld2_checkpoint`](@extref) function.
+# The contents of the checkpoint file are returned as a dictionary `checkpoint` by the [`SmoQyDQMC.read_jld2_checkpoint`](@extref) function.
 # We then extract the contents of the checkpoint file from the `checkpoint` dictionary.
 
     ## If resuming a previous simulation.
@@ -419,7 +419,7 @@ function run_simulation(
 
 # ## Setup DQMC simulation
 # No changes need to made to this section of the code from the previous
-# [2b) Honeycomb Holstein Model with MPI Parallelization](@ref) tutorial.
+# [1b) Honeycomb Holstein Model with MPI Parallelization](@ref) tutorial.
 
     ## Allocate a single FermionPathIntegral for both spin-up and down electrons.
     fermion_path_integral = FermionPathIntegral(tight_binding_parameters = tight_binding_parameters, β = β, Δτ = Δτ)
@@ -445,7 +445,7 @@ function run_simulation(
 
 # ## Setup EFA-PFF-HMC Updates
 # No changes need to made to this section of the code from the previous
-# [2b) Honeycomb Holstein Model with MPI Parallelization](@ref) tutorial.
+# [1b) Honeycomb Holstein Model with MPI Parallelization](@ref) tutorial.
 
     ## Initialize Hamiltonian/Hybrid monte carlo (HMC) updater.
     hmc_updater = EFAPFFHMCUpdater(
@@ -455,8 +455,8 @@ function run_simulation(
 
 # ## Thermalize system
 # The first change we need to make to this section is to have the for-loop iterate from `n_therm:N_therm` instead of `1:N_therm`.
-# The other change we need make to this section of the code from the previous [1b) Square Hubbard Model with MPI Parallelization](@ref) tutorial
-# is to add a call to the [`write_jld2_checkpoint`](@ref) function at the end of each iteration of the
+# The other change we need make to this section of the code from the previous [1b) Honeycomb Holstein Model with MPI Parallelization](@ref) tutorial
+# is to add a call to the [`SmoQyDQMC.write_jld2_checkpoint`](@extref) function at the end of each iteration of the
 # for-loop in which we perform the thermalization updates.
 # When calling this function we need to pass it the timestamp for the previous checkpoint `checkpoint_timestamp`
 # so that the function can determine if a new checkpoint file needs to be written.
@@ -532,8 +532,8 @@ function run_simulation(
 # ## Make measurements
 # Again, we need to modify the for-loop so that it runs from `n_updates:N_updates` instead of `1:N_updates`.
 # The only other change we need to make to this section of the code from the previous
-# [2b) Honeycomb Holstein Model with MPI Parallelization](@ref) tutorial
-# is to add a call to the [`write_jld2_checkpoint`](@ref) function at the end of each iteration of the
+# [1b) Honeycomb Holstein Model with MPI Parallelization](@ref) tutorial
+# is to add a call to the [`SmoQyDQMC.write_jld2_checkpoint`](@extref) function at the end of each iteration of the
 # for-loop in which we perform updates and measurements.
 # Note that we set `n_therm = N_therm + 1` when writing the checkpoint file to ensure that when the simulation
 # is resumed the thermalization updates are not repeated.
@@ -633,14 +633,14 @@ function run_simulation(
     end
 
 # ## Merge binned data
-# No changes need to made to this section of the code from the previous [2a) Honeycomb Holstein Model](@ref) tutorial.
+# No changes need to made to this section of the code from the previous [1a) Honeycomb Holstein Model](@ref) tutorial.
 
     ## Merge binned data into a single HDF5 file.
     merge_bins(simulation_info)
 
 # ## Record simulation metadata
 # No changes need to made to this section of the code from the previous
-# [2b) Honeycomb Holstein Model with MPI Parallelization](@ref) tutorial.
+# [1b) Honeycomb Holstein Model with MPI Parallelization](@ref) tutorial.
 
     ## Calculate acceptance rates.
     metadata["hmc_acceptance_rate"] /= (N_updates + N_therm)
@@ -657,8 +657,8 @@ function run_simulation(
     save_simulation_info(simulation_info, metadata)
 
 # ## Post-process results
-# From the last [2b) Honeycomb Holstein Model with MPI Parallelization](@ref) tutorial, we now recommend adding
-# a call to the [`rename_complete_simulation`](@ref) function once the results are processed.
+# From the last [1b) Honeycomb Holstein Model with MPI Parallelization](@ref) tutorial, we now recommend adding
+# a call to the [`SmoQyDQMC.rename_complete_simulation`](@extref) function once the results are processed.
 # This function renames the data folder to begin with `complete_*`, making it simple to identify which
 # simulations ran to completion and which ones need to be resumed from the last checkpoint file.
 # This function also deletes the checkpoint files that were written during the simulation.
@@ -715,7 +715,7 @@ end # end of run_simulation function
 # ```bash
 # srun julia holstein_honeycomb_checkpoint.jl 1 1.0 1.5 0.0 3 4.0 5000 10000 100 0.5
 # ```
-# Refer to the previous [1b) Square Hubbard Model with MPI Parallelization](@ref) tutorial for more details on how to run the simulation
+# Refer to the previous [1b) Honeycomb Holstein Model with MPI Parallelization](@ref) tutorial for more details on how to run the simulation
 # script using MPI.
 
 # In the example calls above the code will write a new checkpoint if more than 30 minutes (0.5 hours) has passed since the last checkpoint file was written.
