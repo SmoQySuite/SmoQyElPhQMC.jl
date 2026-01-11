@@ -256,7 +256,7 @@ end
 
 # calculate ν⋅Re[⟨u′|Δτ⋅∂V/∂x|v′⟩]
 function _mul_νReΔτ∂V∂x!(
-    νν∂M∂x::AbstractMatrix{E},
+    ν∂M∂x::AbstractMatrix{E},
     ν::E,
     u′::AbstractMatrix,
     v′::AbstractMatrix,
@@ -281,7 +281,7 @@ function _mul_νReΔτ∂V∂x!(
                 # calculate Δτ⋅∂V/∂x
                 ΔτdVdx = Δτ * (α[c] + 2*α2[c]*x[p,l] + 3*α3[c]*x[p,l]^2 + 4*α4[c]*x[p,l]^3)
                 # calculate ν⋅Re[⟨u′|Δτ⋅∂V/∂x|v′⟩]
-                νν∂M∂x[p,l] += ν * real(conj(u′[l,i]) * ΔτdVdx * v′[l,i])
+                ν∂M∂x[p,l] += ν * real(conj(u′[l,i]) * ΔτdVdx * v′[l,i])
             end
         end
     end
