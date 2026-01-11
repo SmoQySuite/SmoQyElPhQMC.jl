@@ -1,7 +1,7 @@
 name = "SmoQyElPhQMC"
 uuid = "2e896e94-a4a1-44d3-bdd1-72a60ceb4988"
-authors = ["Benjamin Cohen-Stead <benwcs@gmail.com>", "Steven Johnston <sjohn145@utk.edu>"]
 version = "1.0.0-DEV"
+authors = ["Benjamin Cohen-Stead <benwcs@gmail.com>", "Steven Johnston <sjohn145@utk.edu>"]
 
 [deps]
 Checkerboard = "b297549e-c8cb-44e5-9c33-b7e2667db6fc"
@@ -31,7 +31,7 @@ LinearAlgebra = "1.10"
 MuTuner = "1.2.4"
 Random = "1.11.0"
 ShiftedArrays = "2.0.0"
-SmoQyDQMC = "1.0"
+SmoQyDQMC = "1.0, 2"
 SmoQyKPMCore = "0.1.4"
 StaticArrays = "1.9"
 Statistics = "1.11.1"
