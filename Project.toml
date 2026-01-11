@@ -21,9 +21,6 @@ StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 TestItemRunner = "f8b46487-2199-4994-9208-9a1283c18c0a"
 
-[sources]
-SmoQyDQMC = {rev = "dev", url = "https://github.com/SmoQySuite/SmoQyDQMC.jl.git"}
-
 [compat]
 Checkerboard = "1.2"
 CircularArrays = "1.4.0"
