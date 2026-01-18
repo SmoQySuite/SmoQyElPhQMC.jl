@@ -17,14 +17,13 @@ function run_simulation(
     L, # System size.
     β, # Inverse temperature.
     N_therm, # Number of thermalization updates.
-    N_updates, # Total number of measurements and measurement updates.
+    N_measurements, # Total number of measurements.
     N_bins, # Number of times bin-averaged measurements are written to file.
     Δτ = 0.05, # Discretization in imaginary time.
-    Nt = 25, # Number of time-steps in HMC update.
+    Nt = 24, # Number of time-steps in HMC update.
     Nrv = 10, # Number of random vectors used to estimate fermionic correlation functions.
     tol = 1e-10, # CG iterations tolerance.
     maxiter = 10_000, # Maximum number of CG iterations.
-    write_bins_concurrent = true, # Whether to write HDF5 bins during the simulation.
     seed = abs(rand(Int)), # Seed for random number generator.
     filepath = &quot;.&quot; # Filepath to where data folder will be created.
 )</code></pre><h2 id="Initialize-simulation"><a class="docs-heading-anchor" href="#Initialize-simulation">Initialize simulation</a><a id="Initialize-simulation-1"></a><a class="docs-heading-anchor-permalink" href="#Initialize-simulation" title="Permalink"></a></h2><p>Now when initializing the <a href="https://smoqysuite.github.io/SmoQyDQMC.jl/stable/api/#SmoQyDQMC.SimulationInfo-Tuple%7B%7D"><code>SmoQyDQMC.SimulationInfo</code></a> type, we also need to include the MPI process ID <code>pID</code>, which can be retrieved using the <a href="https://juliaparallel.org/MPI.jl/stable/reference/comm/#MPI.Comm_rank"><code>MPI.Comm_rank</code></a> function.</p><p>We also the <a href="https://smoqysuite.github.io/SmoQyDQMC.jl/stable/api/#SmoQyDQMC.initialize_datafolder"><code>SmoQyDQMC.initialize_datafolder</code></a> function such that it takes the <code>comm</code> as the first argument. This ensures that all the MPI processes remained synchronized, and none try proceeding beyond this point until the data folder has been initialized.</p><pre><code class="language-julia hljs">    # Construct the foldername the data will be written to.
@@ -37,7 +36,7 @@ function run_simulation(
     simulation_info = SimulationInfo(
         filepath = filepath,
         datafolder_prefix = datafolder_prefix,
-        write_bins_concurrent = write_bins_concurrent,
+        write_bins_concurrent = (L &gt; 7),
         sID = sID,
         pID = pID
     )
@@ -51,7 +50,7 @@ function run_simulation(
 
     # Record simulation parameters.
     metadata[&quot;N_therm&quot;] = N_therm  # Number of thermalization updates
-    metadata[&quot;N_updates&quot;] = N_updates  # Total number of measurements and measurement updates
+    metadata[&quot;N_measurements&quot;] = N_measurements  # Total number of measurements and measurement updates
     metadata[&quot;N_bins&quot;] = N_bins # Number of times bin-averaged measurements are written to file
     metadata[&quot;maxiter&quot;] = maxiter # Maximum number of conjugate gradient iterations
     metadata[&quot;tol&quot;] = tol # Tolerance used for conjugate gradient solves
@@ -321,7 +320,7 @@ function run_simulation(
         electron_phonon_parameters = electron_phonon_parameters,
         Nt = Nt, Δt = π/(2*Nt)
     )</code></pre><h2 id="Thermalize-system"><a class="docs-heading-anchor" href="#Thermalize-system">Thermalize system</a><a id="Thermalize-system-1"></a><a class="docs-heading-anchor-permalink" href="#Thermalize-system" title="Permalink"></a></h2><p>No changes need to made to this section of the code from the previous <a href="../holstein_honeycomb/#1a)-Honeycomb-Holstein-Model">1a) Honeycomb Holstein Model</a> tutorial.</p><pre><code class="language-julia hljs">    # Iterate over number of thermalization updates to perform.
-    for n in 1:N_therm
+    for update in 1:N_therm
 
         # Perform a reflection update.
         (accepted, iters) = reflection_update!(
@@ -370,10 +369,10 @@ function run_simulation(
         # Record the number of CG iterations performed for the reflection update.
         metadata[&quot;hmc_iters&quot;] += iters
     end</code></pre><h2 id="Make-measurements"><a class="docs-heading-anchor" href="#Make-measurements">Make measurements</a><a id="Make-measurements-1"></a><a class="docs-heading-anchor-permalink" href="#Make-measurements" title="Permalink"></a></h2><p>No changes need to made to this section of the code from the previous <a href="../holstein_honeycomb/#1a)-Honeycomb-Holstein-Model">1a) Honeycomb Holstein Model</a> tutorial.</p><pre><code class="language-julia hljs">    # Calculate the bin size.
-    bin_size = N_updates ÷ N_bins
+    bin_size = N_measurements ÷ N_bins
 
     # Iterate over bins.
-    for update in 1:N_updates
+    for measurement in 1:N_measurements
 
         # Perform a reflection update.
         (accepted, iters) = reflection_update!(
@@ -437,26 +436,26 @@ function run_simulation(
         # Record the average number of iterations per CG solve for measurements.
         metadata[&quot;measurement_iters&quot;] += iters
 
-        # Write the bin-averaged measurements to file if update ÷ bin_size == 0.
+        # Write the bin-averaged measurements to file.
         write_measurements!(
             measurement_container = measurement_container,
             simulation_info = simulation_info,
             model_geometry = model_geometry,
-            measurement = update,
+            measurement = measurement,
             bin_size = bin_size,
             Δτ = Δτ
         )
     end</code></pre><h2 id="Merge-binned-data"><a class="docs-heading-anchor" href="#Merge-binned-data">Merge binned data</a><a id="Merge-binned-data-1"></a><a class="docs-heading-anchor-permalink" href="#Merge-binned-data" title="Permalink"></a></h2><p>No changes need to made to this section of the code from the previous <a href="../holstein_honeycomb/#1a)-Honeycomb-Holstein-Model">1a) Honeycomb Holstein Model</a> tutorial.</p><pre><code class="language-julia hljs">    # Merge binned data into a single HDF5 file.
     merge_bins(simulation_info)</code></pre><h2 id="Record-simulation-metadata"><a class="docs-heading-anchor" href="#Record-simulation-metadata">Record simulation metadata</a><a id="Record-simulation-metadata-1"></a><a class="docs-heading-anchor-permalink" href="#Record-simulation-metadata" title="Permalink"></a></h2><p>No changes need to made to this section of the code from the previous <a href="../holstein_honeycomb/#1a)-Honeycomb-Holstein-Model">1a) Honeycomb Holstein Model</a> tutorial.</p><pre><code class="language-julia hljs">    # Calculate acceptance rates.
-    metadata[&quot;hmc_acceptance_rate&quot;] /= (N_updates + N_therm)
-    metadata[&quot;reflection_acceptance_rate&quot;] /= (N_updates + N_therm)
-    metadata[&quot;swap_acceptance_rate&quot;] /= (N_updates + N_therm)
+    metadata[&quot;hmc_acceptance_rate&quot;] /= (N_measurements + N_therm)
+    metadata[&quot;reflection_acceptance_rate&quot;] /= (N_measurements + N_therm)
+    metadata[&quot;swap_acceptance_rate&quot;] /= (N_measurements + N_therm)
 
     # Calculate average number of CG iterations.
-    metadata[&quot;hmc_iters&quot;] /= (N_updates + N_therm)
-    metadata[&quot;reflection_iters&quot;] /= (N_updates + N_therm)
-    metadata[&quot;swap_iters&quot;] /= (N_updates + N_therm)
-    metadata[&quot;measurement_iters&quot;] /= N_updates
+    metadata[&quot;hmc_iters&quot;] /= (N_measurements + N_therm)
+    metadata[&quot;reflection_iters&quot;] /= (N_measurements + N_therm)
+    metadata[&quot;swap_iters&quot;] /= (N_measurements + N_therm)
+    metadata[&quot;measurement_iters&quot;] /= N_measurements
 
     # Write simulation metadata to simulation_info.toml file.
     save_simulation_info(simulation_info, metadata)</code></pre><h2 id="Post-process-results"><a class="docs-heading-anchor" href="#Post-process-results">Post-process results</a><a id="Post-process-results-1"></a><a class="docs-heading-anchor-permalink" href="#Post-process-results" title="Permalink"></a></h2><p>The main change we need to make from the previous <a href="../holstein_honeycomb/#1a)-Honeycomb-Holstein-Model">1a) Honeycomb Holstein Model</a> tutorial is to call the <a href="https://smoqysuite.github.io/SmoQyDQMC.jl/stable/api/#SmoQyDQMC.process_measurements"><code>SmoQyDQMC.process_measurements</code></a> and <a href="https://smoqysuite.github.io/SmoQyDQMC.jl/stable/api/#SmoQyDQMC.compute_composite_correlation_ratio"><code>SmoQyDQMC.compute_composite_correlation_ratio</code></a> functions such that the first argument is the <code>comm</code> object, thereby ensuring a parallelized version of each method is called.</p><pre><code class="language-julia hljs">    # Process the simulation results, calculating final error bars for all measurements.
@@ -504,17 +503,17 @@ if abspath(PROGRAM_FILE) == @__FILE__
     # Run the simulation.
     run_simulation(
         comm;
-        sID       = parse(Int,     ARGS[1]), # Simulation ID.
-        Ω         = parse(Float64, ARGS[2]), # Phonon energy.
-        α         = parse(Float64, ARGS[3]), # Electron-phonon coupling.
-        μ         = parse(Float64, ARGS[4]), # Chemical potential.
-        L         = parse(Int,     ARGS[5]), # System size.
-        β         = parse(Float64, ARGS[6]), # Inverse temperature.
-        N_therm   = parse(Int,     ARGS[7]), # Number of thermalization updates.
-        N_updates = parse(Int,     ARGS[8]), # Total number of measurements and measurement updates.
-        N_bins    = parse(Int,     ARGS[9])  # Number of times bin-averaged measurements are written to file.
+        sID = parse(Int, ARGS[1]), # Simulation ID.
+        Ω = parse(Float64, ARGS[2]), # Phonon energy.
+        α = parse(Float64, ARGS[3]), # Electron-phonon coupling.
+        μ = parse(Float64, ARGS[4]), # Chemical potential.
+        L = parse(Int, ARGS[5]), # System size.
+        β = parse(Float64, ARGS[6]), # Inverse temperature.
+        N_therm = parse(Int, ARGS[7]), # Number of thermalization updates.
+        N_measurements = parse(Int, ARGS[8]), # Total number of measurements and measurement updates.
+        N_bins = parse(Int, ARGS[9]) # Number of times bin-averaged measurements are written to file.
     )
 
     # Finalize MPI.
     MPI.Finalize()
-end</code></pre><p>Here is an example of what the command to run this script might look like:</p><pre><code class="language-bash hljs">mpiexecjl -n 16 julia holstein_honeycomb_mpi.jl 1 1.0 1.5 0.0 3 4.0 5000 10000 100</code></pre><p>This will 16 MPI processes, each running and independent simulation using a different random seed the the final results arrived at by averaging over all 16 walkers. Here <code>mpiexecjl</code> is the MPI executable that can be easily install using the directions found <a href="https://juliaparallel.org/MPI.jl/stable/usage/#Julia-wrapper-for-mpiexec">here</a> in the <a href="https://github.com/JuliaParallel/MPI.jl">MPI.jl</a> documentation. However, you can substitute a different MPI executable here if one is already configured on your system.</p><p>Also, when submitting jobs via <a href="https://slurm.schedmd.com/documentation.html">SLURM</a> on a High-Performance Computing (HPC) cluster, if a default MPI executable is already configured on the system, as is frequently the case, then the script can likely be run inside the <code>*.sh</code> job file using the <a href="https://slurm.schedmd.com/srun.html"><code>srun</code></a> command:</p><pre><code class="language-bash hljs">srun julia holstein_honeycomb_mpi.jl 1 1.0 1.5 0.0 3 4.0 5000 10000 100</code></pre><p>The <code>srun</code> command should automatically detect the number of available cores requested by the job and run the script using the MPI executable with the appropriate number of processes.</p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../holstein_honeycomb/">« 1a) Honeycomb Holstein Model</a><a class="docs-footer-nextpage" href="../holstein_honeycomb_checkpoint/">1c) Honeycomb Holstein Model with Checkpointing »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.16.1 on <span class="colophon-date" title="Sunday 11 January 2026 22:50">Sunday 11 January 2026</span>. Using Julia version 1.12.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+end</code></pre><p>Here is an example of what the command to run this script might look like:</p><pre><code class="language-bash hljs">mpiexecjl -n 16 julia holstein_honeycomb_mpi.jl 1 1.0 1.5 0.0 3 4.0 5000 10000 100</code></pre><p>This will 16 MPI processes, each running and independent simulation using a different random seed the the final results arrived at by averaging over all 16 walkers. Here <code>mpiexecjl</code> is the MPI executable that can be easily install using the directions found <a href="https://juliaparallel.org/MPI.jl/stable/usage/#Julia-wrapper-for-mpiexec">here</a> in the <a href="https://github.com/JuliaParallel/MPI.jl">MPI.jl</a> documentation. However, you can substitute a different MPI executable here if one is already configured on your system.</p><p>Also, when submitting jobs via <a href="https://slurm.schedmd.com/documentation.html">SLURM</a> on a High-Performance Computing (HPC) cluster, if a default MPI executable is already configured on the system, as is frequently the case, then the script can likely be run inside the <code>*.sh</code> job file using the <a href="https://slurm.schedmd.com/srun.html"><code>srun</code></a> command:</p><pre><code class="language-bash hljs">srun julia holstein_honeycomb_mpi.jl 1 1.0 1.5 0.0 3 4.0 5000 10000 100</code></pre><p>The <code>srun</code> command should automatically detect the number of available cores requested by the job and run the script using the MPI executable with the appropriate number of processes.</p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../holstein_honeycomb/">« 1a) Honeycomb Holstein Model</a><a class="docs-footer-nextpage" href="../holstein_honeycomb_checkpoint/">1c) Honeycomb Holstein Model with Checkpointing »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.16.1 on <span class="colophon-date" title="Sunday 18 January 2026 13:36">Sunday 18 January 2026</span>. Using Julia version 1.12.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

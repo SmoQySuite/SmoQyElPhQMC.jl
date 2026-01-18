@@ -16,14 +16,13 @@ function run_simulation(;
     L, # System size.
     β, # Inverse temperature.
     N_therm, # Number of thermalization updates.
-    N_updates, # Total number of measurements and measurement updates.
+    N_measurements, # Total number of measurements to make.
     N_bins, # Number of times bin-averaged measurements are written to file.
     Δτ = 0.05, # Discretization in imaginary time.
-    Nt = 25, # Number of time-steps in HMC update.
+    Nt = 24, # Number of time-steps in HMC update.
     Nrv = 10, # Number of random vectors used to estimate fermionic correlation functions.
     tol = 1e-10, # CG iterations tolerance.
     maxiter = 10_000, # Maximum number of CG iterations.
-    write_bins_concurrent = true, # Whether to write HDF5 bins during the simulation.
     seed = abs(rand(Int)), # Seed for random number generator.
     filepath = "." # Filepath to where data folder will be created.
 )
@@ -35,7 +34,7 @@ function run_simulation(;
     simulation_info = SimulationInfo(
         filepath = filepath,
         datafolder_prefix = datafolder_prefix,
-        write_bins_concurrent = write_bins_concurrent,
+        write_bins_concurrent = (L > 7),
         sID = sID
     )
 
@@ -50,7 +49,7 @@ function run_simulation(;
 
     # Record simulation parameters.
     metadata["N_therm"] = N_therm  # Number of thermalization updates
-    metadata["N_updates"] = N_updates  # Total number of measurements and measurement updates
+    metadata["N_measurements"] = N_measurements  # Total number of measurements and measurement updates
     metadata["N_bins"] = N_bins # Number of times bin-averaged measurements are written to file
     metadata["maxiter"] = maxiter # Maximum number of conjugate gradient iterations
     metadata["tol"] = tol # Tolerance used for conjugate gradient solves
@@ -335,7 +334,7 @@ function run_simulation(;
     )
 
     # Iterate over number of thermalization updates to perform.
-    for n in 1:N_therm
+    for update in 1:N_therm
 
         # Perform a reflection update.
         (accepted, iters) = reflection_update!(
@@ -386,10 +385,10 @@ function run_simulation(;
     end
 
     # Calculate the bin size.
-    bin_size = N_updates ÷ N_bins
+    bin_size = N_measurements ÷ N_bins
 
     # Iterate over bins.
-    for update in 1:N_updates
+    for measurement in 1:N_measurements
 
         # Perform a reflection update.
         (accepted, iters) = reflection_update!(
@@ -453,12 +452,12 @@ function run_simulation(;
         # Record the average number of iterations per CG solve for measurements.
         metadata["measurement_iters"] += iters
 
-        # Write the bin-averaged measurements to file if update ÷ bin_size == 0.
+        # Write the bin-averaged measurements to file.
         write_measurements!(
             measurement_container = measurement_container,
             simulation_info = simulation_info,
             model_geometry = model_geometry,
-            measurement = update,
+            measurement = measurement,
             bin_size = bin_size,
             Δτ = Δτ
         )
@@ -468,15 +467,15 @@ function run_simulation(;
     merge_bins(simulation_info)
 
     # Calculate acceptance rates.
-    metadata["hmc_acceptance_rate"] /= (N_updates + N_therm)
-    metadata["reflection_acceptance_rate"] /= (N_updates + N_therm)
-    metadata["swap_acceptance_rate"] /= (N_updates + N_therm)
+    metadata["hmc_acceptance_rate"] /= (N_measurements + N_therm)
+    metadata["reflection_acceptance_rate"] /= (N_measurements + N_therm)
+    metadata["swap_acceptance_rate"] /= (N_measurements + N_therm)
 
     # Calculate average number of CG iterations.
-    metadata["hmc_iters"] /= (N_updates + N_therm)
-    metadata["reflection_iters"] /= (N_updates + N_therm)
-    metadata["swap_iters"] /= (N_updates + N_therm)
-    metadata["measurement_iters"] /= N_updates
+    metadata["hmc_iters"] /= (N_measurements + N_therm)
+    metadata["reflection_iters"] /= (N_measurements + N_therm)
+    metadata["swap_iters"] /= (N_measurements + N_therm)
+    metadata["measurement_iters"] /= N_measurements
 
     # Write simulation metadata to simulation_info.toml file.
     save_simulation_info(simulation_info, metadata)
@@ -507,7 +506,7 @@ function run_simulation(;
     # Record the AFM correlation ratio mean and standard deviation.
     metadata["Rcdw_mean_real"] = real(Rcdw)
     metadata["Rcdw_mean_imag"] = imag(Rcdw)
-    metadata["Rcdw_std"]       = ΔRcdw
+    metadata["Rcdw_std"] = ΔRcdw
 
     # Write simulation summary TOML file.
     save_simulation_info(simulation_info, metadata)
@@ -520,14 +519,14 @@ if abspath(PROGRAM_FILE) == @__FILE__
 
     # Run the simulation.
     run_simulation(
-        sID       = parse(Int,     ARGS[1]),
-        Ω         = parse(Float64, ARGS[2]),
-        α         = parse(Float64, ARGS[3]),
-        μ         = parse(Float64, ARGS[4]),
-        L         = parse(Int,     ARGS[5]),
-        β         = parse(Float64, ARGS[6]),
-        N_therm   = parse(Int,     ARGS[7]),
-        N_updates = parse(Int,     ARGS[8]),
-        N_bins    = parse(Int,     ARGS[9]),
+        sID = parse(Int, ARGS[1]),
+        Ω = parse(Float64, ARGS[2]),
+        α = parse(Float64, ARGS[3]),
+        μ = parse(Float64, ARGS[4]),
+        L = parse(Int, ARGS[5]),
+        β = parse(Float64, ARGS[6]),
+        N_therm = parse(Int, ARGS[7]),
+        N_measurements = parse(Int, ARGS[8]),
+        N_bins = parse(Int, ARGS[9]),
     )
 end

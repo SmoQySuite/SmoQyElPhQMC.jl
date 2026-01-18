@@ -28,7 +28,6 @@ function run_simulation(
     Nrv = 10, # Number of random vectors used to estimate fermionic correlation functions.
     tol = 1e-10, # CG iterations tolerance.
     maxiter = 10_000, # Maximum number of CG iterations.
-    write_bins_concurrent = true, # Whether to write HDF5 bins during the simulation.
     seed = abs(rand(Int)), # Seed for random number generator.
     filepath = "." # Filepath to where data folder will be created.
 )
@@ -52,7 +51,7 @@ function run_simulation(
     simulation_info = SimulationInfo(
         filepath = filepath,
         datafolder_prefix = datafolder_prefix,
-        write_bins_concurrent = write_bins_concurrent,
+        write_bins_concurrent = (L > 7),
         sID = sID,
         pID = pID
     )
