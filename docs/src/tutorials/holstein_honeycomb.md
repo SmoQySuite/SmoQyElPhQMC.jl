@@ -68,14 +68,13 @@ function run_simulation(;
     L, # System size.
     β, # Inverse temperature.
     N_therm, # Number of thermalization updates.
-    N_updates, # Total number of measurements and measurement updates.
+    N_measurements, # Total number of measurements to make.
     N_bins, # Number of times bin-averaged measurements are written to file.
     Δτ = 0.05, # Discretization in imaginary time.
-    Nt = 25, # Number of time-steps in HMC update.
+    Nt = 24, # Number of time-steps in HMC update.
     Nrv = 10, # Number of random vectors used to estimate fermionic correlation functions.
     tol = 1e-10, # CG iterations tolerance.
     maxiter = 10_000, # Maximum number of CG iterations.
-    write_bins_concurrent = true, # Whether to write HDF5 bins during the simulation.
     seed = abs(rand(Int)), # Seed for random number generator.
     filepath = "." # Filepath to where data folder will be created.
 )
@@ -83,11 +82,15 @@ function run_simulation(;
 
 ## Initialize simulation
 In this first part of the script we name and initialize our simulation, creating the data folder our simulation results will be written to.
-This is done by initializing an instances of the [`SmoQyDQMC.SimulationInfo`](@extref) type, as well as an `metadata` dictionary where we will store useful metadata about the simulation.
-Finally, the integer `seed` is used to initialize the random number generator `rng` that will be used to generate random numbers throughout the rest of the simulation.
+This is done by initializing an instances of the [`SmoQyDQMC.SimulationInfo`](@extref) type.
 
-Next we record relevant simulation parameters to the `metadata` dictionary.
-Think of the `metadata` dictionary as a place to record any additional information during the simulation that will not otherwise be automatically recorded and written to file.
+Note that the `write_bins_concurrent` keyword arguments controls whether or not binned simulation measurement data
+is written to HDF5 file during the simulation, or held in memory and only written to file once the simulation is complete.
+Here we decide how to set `write_bins_concurrent` based on the system size being simulated.
+This is because when performing simulations of small systems that do not take very long, writing data to file too frequently can
+sometimes cause network latency problems on clusters and HPC systems. However, for larger systems that take longer to simulate,
+you are not limited by file IO frequency but rather by available memory, so writing data to file more frequently is preferred
+in these cases.
 
 ````julia
     # Construct the foldername the data will be written to.
@@ -97,7 +100,7 @@ Think of the `metadata` dictionary as a place to record any additional informati
     simulation_info = SimulationInfo(
         filepath = filepath,
         datafolder_prefix = datafolder_prefix,
-        write_bins_concurrent = write_bins_concurrent,
+        write_bins_concurrent = (L > 7),
         sID = sID
     )
 
@@ -109,6 +112,8 @@ Think of the `metadata` dictionary as a place to record any additional informati
 In this section of the code we record important metadata about the simulation, including initializing the random number
 generator that will be used throughout the simulation.
 The important metadata within the simulation will be recorded in the `metadata` dictionary.
+Think of the `metadata` dictionary as a place to record any additional information during the simulation that will not
+otherwise be automatically recorded and written to file.
 
 ````julia
     # Initialize random number generator
@@ -119,7 +124,7 @@ The important metadata within the simulation will be recorded in the `metadata` 
 
     # Record simulation parameters.
     metadata["N_therm"] = N_therm  # Number of thermalization updates
-    metadata["N_updates"] = N_updates  # Total number of measurements and measurement updates
+    metadata["N_measurements"] = N_measurements  # Total number of measurements and measurement updates
     metadata["N_bins"] = N_bins # Number of times bin-averaged measurements are written to file
     metadata["maxiter"] = maxiter # Maximum number of conjugate gradient iterations
     metadata["tol"] = tol # Tolerance used for conjugate gradient solves
@@ -599,7 +604,7 @@ the [`hmc_update!`](@ref) function below, we will also perform reflection and sw
 
 ````julia
     # Iterate over number of thermalization updates to perform.
-    for n in 1:N_therm
+    for update in 1:N_therm
 
         # Perform a reflection update.
         (accepted, iters) = reflection_update!(
@@ -657,10 +662,10 @@ structure of this part of the code, refer to here.
 
 ````julia
     # Calculate the bin size.
-    bin_size = N_updates ÷ N_bins
+    bin_size = N_measurements ÷ N_bins
 
     # Iterate over bins.
-    for update in 1:N_updates
+    for measurement in 1:N_measurements
 
         # Perform a reflection update.
         (accepted, iters) = reflection_update!(
@@ -724,12 +729,12 @@ structure of this part of the code, refer to here.
         # Record the average number of iterations per CG solve for measurements.
         metadata["measurement_iters"] += iters
 
-        # Write the bin-averaged measurements to file if update ÷ bin_size == 0.
+        # Write the bin-averaged measurements to file.
         write_measurements!(
             measurement_container = measurement_container,
             simulation_info = simulation_info,
             model_geometry = model_geometry,
-            measurement = update,
+            measurement = measurement,
             bin_size = bin_size,
             Δτ = Δτ
         )
@@ -755,15 +760,15 @@ including the contents of the `metadata` dictionary.
 
 ````julia
     # Calculate acceptance rates.
-    metadata["hmc_acceptance_rate"] /= (N_updates + N_therm)
-    metadata["reflection_acceptance_rate"] /= (N_updates + N_therm)
-    metadata["swap_acceptance_rate"] /= (N_updates + N_therm)
+    metadata["hmc_acceptance_rate"] /= (N_measurements + N_therm)
+    metadata["reflection_acceptance_rate"] /= (N_measurements + N_therm)
+    metadata["swap_acceptance_rate"] /= (N_measurements + N_therm)
 
     # Calculate average number of CG iterations.
-    metadata["hmc_iters"] /= (N_updates + N_therm)
-    metadata["reflection_iters"] /= (N_updates + N_therm)
-    metadata["swap_iters"] /= (N_updates + N_therm)
-    metadata["measurement_iters"] /= N_updates
+    metadata["hmc_iters"] /= (N_measurements + N_therm)
+    metadata["reflection_iters"] /= (N_measurements + N_therm)
+    metadata["swap_iters"] /= (N_measurements + N_therm)
+    metadata["measurement_iters"] /= N_measurements
 
     # Write simulation metadata to simulation_info.toml file.
     save_simulation_info(simulation_info, metadata)
@@ -837,7 +842,7 @@ contains this new information using the [`SmoQyDQMC.save_simulation_info`](@extr
     # Record the AFM correlation ratio mean and standard deviation.
     metadata["Rcdw_mean_real"] = real(Rcdw)
     metadata["Rcdw_mean_imag"] = imag(Rcdw)
-    metadata["Rcdw_std"]       = ΔRcdw
+    metadata["Rcdw_std"] = ΔRcdw
 
     # Write simulation summary TOML file.
     save_simulation_info(simulation_info, metadata)
@@ -862,15 +867,15 @@ if abspath(PROGRAM_FILE) == @__FILE__
 
     # Run the simulation.
     run_simulation(
-        sID       = parse(Int,     ARGS[1]),
-        Ω         = parse(Float64, ARGS[2]),
-        α         = parse(Float64, ARGS[3]),
-        μ         = parse(Float64, ARGS[4]),
-        L         = parse(Int,     ARGS[5]),
-        β         = parse(Float64, ARGS[6]),
-        N_therm   = parse(Int,     ARGS[7]),
-        N_updates = parse(Int,     ARGS[8]),
-        N_bins    = parse(Int,     ARGS[9]),
+        sID = parse(Int, ARGS[1]),
+        Ω = parse(Float64, ARGS[2]),
+        α = parse(Float64, ARGS[3]),
+        μ = parse(Float64, ARGS[4]),
+        L = parse(Int, ARGS[5]),
+        β = parse(Float64, ARGS[6]),
+        N_therm = parse(Int, ARGS[7]),
+        N_measurements = parse(Int, ARGS[8]),
+        N_bins = parse(Int, ARGS[9]),
     )
 end
 ````
