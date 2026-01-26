@@ -17,16 +17,15 @@ function run_simulation(
     L, # System size.
     β, # Inverse temperature.
     N_therm, # Number of thermalization updates.
-    N_updates, # Total number of measurements and measurement updates.
+    N_measurements, # Total number of measurements and measurement updates.
     N_bins, # Number of times bin-averaged measurements are written to file.
     checkpoint_freq, # Frequency with which checkpoint files are written in hours.
     runtime_limit = Inf, # Simulation runtime limit in hours.
     Δτ = 0.05, # Discretization in imaginary time.
-    Nt = 25, # Number of time-steps in HMC update.
+    Nt = 24, # Number of time-steps in HMC update.
     Nrv = 10, # Number of random vectors used to estimate fermionic correlation functions.
     tol = 1e-10, # CG iterations tolerance.
     maxiter = 10_000, # Maximum number of CG iterations.
-    write_bins_concurrent = true, # Whether to write the HDF5 bins files during the simulation.
     seed = abs(rand(Int)), # Seed for random number generator.
     filepath = "." # Filepath to where data folder will be created.
 )
@@ -50,7 +49,7 @@ function run_simulation(
     simulation_info = SimulationInfo(
         filepath = filepath,
         datafolder_prefix = datafolder_prefix,
-        write_bins_concurrent = write_bins_concurrent,
+        write_bins_concurrent = (L > 10),
         sID = sID,
         pID = pID
     )
@@ -65,7 +64,7 @@ function run_simulation(
         n_therm = 1
 
         # Begin measurement updates from start.
-        n_updates = 1
+        n_measurements = 1
 
         # Initialize random number generator
         rng = Xoshiro(seed)
@@ -76,7 +75,7 @@ function run_simulation(
         # Record simulation parameters.
         metadata["Nt"] = Nt
         metadata["N_therm"] = N_therm
-        metadata["N_updates"] = N_updates
+        metadata["N_measurements"] = N_measurements
         metadata["N_bins"] = N_bins
         metadata["Nrv"] = Nrv
         metadata["maxiter"] = maxiter
@@ -274,7 +273,7 @@ function run_simulation(
             start_timestamp = start_timestamp,
             runtime_limit = runtime_limit,
             # Contents of checkpoint file below.
-            n_therm, n_updates,
+            n_therm, n_measurements,
             tight_binding_parameters, electron_phonon_parameters,
             measurement_container, model_geometry, metadata, rng
         )
@@ -286,14 +285,14 @@ function run_simulation(
         checkpoint, checkpoint_timestamp = read_jld2_checkpoint(simulation_info)
 
         # Unpack contents of checkpoint dictionary.
-        tight_binding_parameters    = checkpoint["tight_binding_parameters"]
-        electron_phonon_parameters  = checkpoint["electron_phonon_parameters"]
-        measurement_container       = checkpoint["measurement_container"]
-        model_geometry              = checkpoint["model_geometry"]
-        metadata                    = checkpoint["metadata"]
-        rng                         = checkpoint["rng"]
-        n_therm                     = checkpoint["n_therm"]
-        n_updates                   = checkpoint["n_updates"]
+        tight_binding_parameters = checkpoint["tight_binding_parameters"]
+        electron_phonon_parameters = checkpoint["electron_phonon_parameters"]
+        measurement_container = checkpoint["measurement_container"]
+        model_geometry = checkpoint["model_geometry"]
+        metadata = checkpoint["metadata"]
+        rng = checkpoint["rng"]
+        n_therm = checkpoint["n_therm"]
+        n_measurements = checkpoint["n_measurements"]
     end
 
     # Allocate a single FermionPathIntegral for both spin-up and down electrons.
@@ -384,17 +383,17 @@ function run_simulation(
             runtime_limit = runtime_limit,
             # Contents of checkpoint file below.
             n_therm  = update + 1,
-            n_updates = 1,
+            n_measurements = 1,
             tight_binding_parameters, electron_phonon_parameters,
             measurement_container, model_geometry, metadata, rng
         )
     end
 
     # Calculate the bin size.
-    bin_size = N_updates ÷ N_bins
+    bin_size = N_measurements ÷ N_bins
 
     # Iterate over updates and measurements.
-    for update in n_updates:N_updates
+    for update in n_measurements:N_measurements
 
         # Perform a reflection update.
         (accepted, iters) = reflection_update!(
@@ -478,7 +477,7 @@ function run_simulation(
             runtime_limit = runtime_limit,
             # Contents of checkpoint file below.
             n_therm  = N_therm + 1,
-            n_updates = update + 1,
+            n_measurements = update + 1,
             tight_binding_parameters, electron_phonon_parameters,
             measurement_container, model_geometry, metadata, rng
         )
@@ -488,15 +487,15 @@ function run_simulation(
     merge_bins(simulation_info)
 
     # Calculate acceptance rates.
-    metadata["hmc_acceptance_rate"] /= (N_updates + N_therm)
-    metadata["reflection_acceptance_rate"] /= (N_updates + N_therm)
-    metadata["swap_acceptance_rate"] /= (N_updates + N_therm)
+    metadata["hmc_acceptance_rate"] /= (N_measurements + N_therm)
+    metadata["reflection_acceptance_rate"] /= (N_measurements + N_therm)
+    metadata["swap_acceptance_rate"] /= (N_measurements + N_therm)
 
     # Calculate average number of CG iterations.
-    metadata["hmc_iters"] /= (N_updates + N_therm)
-    metadata["reflection_iters"] /= (N_updates + N_therm)
-    metadata["swap_iters"] /= (N_updates + N_therm)
-    metadata["measurement_iters"] /= N_updates
+    metadata["hmc_iters"] /= (N_measurements + N_therm)
+    metadata["reflection_iters"] /= (N_measurements + N_therm)
+    metadata["swap_iters"] /= (N_measurements + N_therm)
+    metadata["measurement_iters"] /= N_measurements
 
     # Write simulation metadata to simulation_info.toml file.
     save_simulation_info(simulation_info, metadata)
@@ -537,15 +536,15 @@ if abspath(PROGRAM_FILE) == @__FILE__
     # Run the simulation.
     run_simulation(
         comm;
-        sID             = parse(Int,     ARGS[1]),  # Simulation ID.
-        Ω               = parse(Float64, ARGS[2]),  # Phonon energy.
-        α               = parse(Float64, ARGS[3]),  # Electron-phonon coupling.
-        μ               = parse(Float64, ARGS[4]),  # Chemical potential.
-        L               = parse(Int,     ARGS[5]),  # System size.
-        β               = parse(Float64, ARGS[6]),  # Inverse temperature.
-        N_therm         = parse(Int,     ARGS[7]),  # Number of thermalization updates.
-        N_updates       = parse(Int,     ARGS[8]),  # Total number of measurements and measurement updates.
-        N_bins          = parse(Int,     ARGS[9]),  # Number of times bin-averaged measurements are written to file.
+        sID = parse(Int, ARGS[1]), # Simulation ID.
+        Ω = parse(Float64, ARGS[2]), # Phonon energy.
+        α = parse(Float64, ARGS[3]), # Electron-phonon coupling.
+        μ = parse(Float64, ARGS[4]), # Chemical potential.
+        L = parse(Int, ARGS[5]), # System size.
+        β = parse(Float64, ARGS[6]), # Inverse temperature.
+        N_therm = parse(Int, ARGS[7]), # Number of thermalization updates.
+        N_measurements = parse(Int, ARGS[8]), # Total number of measurements and measurement updates.
+        N_bins = parse(Int, ARGS[9]), # Number of times bin-averaged measurements are written to file.
         checkpoint_freq = parse(Float64, ARGS[10]), # Frequency with which checkpoint files are written in hours.
     )
 

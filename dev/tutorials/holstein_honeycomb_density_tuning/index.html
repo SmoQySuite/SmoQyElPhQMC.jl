@@ -18,7 +18,7 @@ function run_simulation(
     L, # System size.
     β, # Inverse temperature.
     N_therm, # Number of thermalization updates.
-    N_updates, # Total number of measurements and measurement updates.
+    N_measurements, # Total number of measurements and measurement updates.
     N_bins, # Number of times bin-averaged measurements are written to file.
     checkpoint_freq, # Frequency with which checkpoint files are written in hours.
     runtime_limit = Inf, # Simulation runtime limit in hours.
@@ -61,7 +61,7 @@ function run_simulation(
         n_therm = 1
 
         # Begin measurement updates from start.
-        n_updates = 1
+        n_measurements = 1
 
         # Initialize random number generator
         rng = Xoshiro(seed)
@@ -71,7 +71,7 @@ function run_simulation(
 
         # Record simulation parameters.
         metadata[&quot;N_therm&quot;] = N_therm  # Number of thermalization updates
-        metadata[&quot;N_updates&quot;] = N_updates  # Total number of measurements and measurement updates
+        metadata[&quot;N_measurements&quot;] = N_measurements  # Total number of measurements and measurement updates
         metadata[&quot;N_bins&quot;] = N_bins # Number of times bin-averaged measurements are written to file
         metadata[&quot;maxiter&quot;] = maxiter # Maximum number of conjugate gradient iterations
         metadata[&quot;tol&quot;] = tol # Tolerance used for conjugate gradient solves
@@ -334,7 +334,7 @@ function run_simulation(
             start_timestamp = start_timestamp,
             runtime_limit = runtime_limit,
             # Contents of checkpoint file below.
-            n_therm, n_updates,
+            n_therm, n_measurements,
             tight_binding_parameters, electron_phonon_parameters, chemical_potential_tuner,
             measurement_container, model_geometry, metadata, rng
         )</code></pre><h2 id="Load-checkpoint"><a class="docs-heading-anchor" href="#Load-checkpoint">Load checkpoint</a><a id="Load-checkpoint-1"></a><a class="docs-heading-anchor-permalink" href="#Load-checkpoint" title="Permalink"></a></h2><p>Here we need to make sure to load the <a href="https://cohensbw.github.io/MuTuner.jl/stable/api/"><code>MuTuner.MuTunerLogger</code></a> instance <code>chemical_potential_tuner</code> from the checkpoint file.</p><pre><code class="language-julia hljs">    # If resuming a previous simulation.
@@ -352,7 +352,7 @@ function run_simulation(
         metadata                    = checkpoint[&quot;metadata&quot;]
         rng                         = checkpoint[&quot;rng&quot;]
         n_therm                     = checkpoint[&quot;n_therm&quot;]
-        n_updates                   = checkpoint[&quot;n_updates&quot;]
+        n_measurements                   = checkpoint[&quot;n_measurements&quot;]
     end</code></pre><h2 id="Setup-DQMC-simulation"><a class="docs-heading-anchor" href="#Setup-DQMC-simulation">Setup DQMC simulation</a><a id="Setup-DQMC-simulation-1"></a><a class="docs-heading-anchor-permalink" href="#Setup-DQMC-simulation" title="Permalink"></a></h2><p>No changes need to made to this section of the code from the previous <a href="../holstein_honeycomb_checkpoint/#1c)-Honeycomb-Holstein-Model-with-Checkpointing">1c) Honeycomb Holstein Model with Checkpointing</a> tutorial.</p><pre><code class="language-julia hljs">    # Allocate a single FermionPathIntegral for both spin-up and down electrons.
     fermion_path_integral = FermionPathIntegral(tight_binding_parameters = tight_binding_parameters, β = β, Δτ = Δτ)
 
@@ -447,15 +447,15 @@ function run_simulation(
             runtime_limit = runtime_limit,
             # Contents of checkpoint file below.
             n_therm  = update + 1,
-            n_updates = 1,
+            n_measurements = 1,
             tight_binding_parameters, electron_phonon_parameters, chemical_potential_tuner,
             measurement_container, model_geometry, metadata, rng
         )
     end</code></pre><h2 id="Make-measurements"><a class="docs-heading-anchor" href="#Make-measurements">Make measurements</a><a id="Make-measurements-1"></a><a class="docs-heading-anchor-permalink" href="#Make-measurements" title="Permalink"></a></h2><p>Here we need to add a call to the <a href="https://smoqysuite.github.io/SmoQyDQMC.jl/stable/api/#SmoQyDQMC.update_chemical_potential%21"><code>SmoQyDQMC.update_chemical_potential!</code></a> function after making and writing measurements but before writing the checkpoint file is written. And again, we need to make sure the include the <code>chemical_potential_tuner</code> in the checkpoint file.</p><pre><code class="language-julia hljs">    # Calculate the bin size.
-    bin_size = N_updates ÷ N_bins
+    bin_size = N_measurements ÷ N_bins
 
     # Iterate over updates and measurements.
-    for update in n_updates:N_updates
+    for update in n_measurements:N_measurements
 
         # Perform a reflection update.
         (accepted, iters) = reflection_update!(
@@ -549,21 +549,21 @@ function run_simulation(
             runtime_limit = runtime_limit,
             # Contents of checkpoint file below.
             n_therm  = N_therm + 1,
-            n_updates = update + 1,
+            n_measurements = update + 1,
             tight_binding_parameters, electron_phonon_parameters, chemical_potential_tuner,
             measurement_container, model_geometry, metadata, rng
         )
     end</code></pre><h2 id="Merge-binned-data"><a class="docs-heading-anchor" href="#Merge-binned-data">Merge binned data</a><a id="Merge-binned-data-1"></a><a class="docs-heading-anchor-permalink" href="#Merge-binned-data" title="Permalink"></a></h2><p>No changes need to made to this section of the code from the previous <a href="../holstein_honeycomb/#1a)-Honeycomb-Holstein-Model">1a) Honeycomb Holstein Model</a> tutorial.</p><pre><code class="language-julia hljs">    # Merge binned data into a single HDF5 file.
     merge_bins(simulation_info)</code></pre><h2 id="Record-simulation-metadata"><a class="docs-heading-anchor" href="#Record-simulation-metadata">Record simulation metadata</a><a id="Record-simulation-metadata-1"></a><a class="docs-heading-anchor-permalink" href="#Record-simulation-metadata" title="Permalink"></a></h2><p>Here we can add a call to the <a href="https://smoqysuite.github.io/SmoQyDQMC.jl/stable/api/#SmoQyDQMC.save_density_tuning_profile"><code>SmoQyDQMC.save_density_tuning_profile</code></a>, which records the full history of the chemical potential and density tuning process.</p><pre><code class="language-julia hljs">    # Calculate acceptance rates.
-    metadata[&quot;hmc_acceptance_rate&quot;] /= (N_updates + N_therm)
-    metadata[&quot;reflection_acceptance_rate&quot;] /= (N_updates + N_therm)
-    metadata[&quot;swap_acceptance_rate&quot;] /= (N_updates + N_therm)
+    metadata[&quot;hmc_acceptance_rate&quot;] /= (N_measurements + N_therm)
+    metadata[&quot;reflection_acceptance_rate&quot;] /= (N_measurements + N_therm)
+    metadata[&quot;swap_acceptance_rate&quot;] /= (N_measurements + N_therm)
 
     # Calculate average number of CG iterations.
-    metadata[&quot;hmc_iters&quot;] /= (N_updates + N_therm)
-    metadata[&quot;reflection_iters&quot;] /= (N_updates + N_therm)
-    metadata[&quot;swap_iters&quot;] /= (N_updates + N_therm)
-    metadata[&quot;measurement_iters&quot;] /= N_updates
+    metadata[&quot;hmc_iters&quot;] /= (N_measurements + N_therm)
+    metadata[&quot;reflection_iters&quot;] /= (N_measurements + N_therm)
+    metadata[&quot;swap_iters&quot;] /= (N_measurements + N_therm)
+    metadata[&quot;measurement_iters&quot;] /= N_measurements
 
     # Write simulation metadata to simulation_info.toml file.
     save_simulation_info(simulation_info, metadata)
@@ -617,16 +617,16 @@ if abspath(PROGRAM_FILE) == @__FILE__
     # Run the simulation.
     run_simulation(
         MPI.COMM_WORLD;
-        sID             = parse(Int,     ARGS[1]),  # Simulation ID.
-        Ω               = parse(Float64, ARGS[2]),  # Phonon energy.
-        α               = parse(Float64, ARGS[3]),  # Electron-phonon coupling.
-        n               = parse(Float64, ARGS[4]),  # Target density.
-        μ               = parse(Float64, ARGS[5]),  # Initial chemical potential.
-        L               = parse(Int,     ARGS[6]),  # System size.
-        β               = parse(Float64, ARGS[7]),  # Inverse temperature.
-        N_therm         = parse(Int,     ARGS[8]),  # Number of thermalization updates.
-        N_updates       = parse(Int,     ARGS[9]),  # Total number of measurements and measurement updates.
-        N_bins          = parse(Int,     ARGS[10]), # Number of times bin-averaged measurements are written to file.
+        sID = parse(Int, ARGS[1]), # Simulation ID.
+        Ω = parse(Float64, ARGS[2]), # Phonon energy.
+        α = parse(Float64, ARGS[3]), # Electron-phonon coupling.
+        n = parse(Float64, ARGS[4]), # Target density.
+        μ = parse(Float64, ARGS[5]), # Initial chemical potential.
+        L = parse(Int, ARGS[6]), # System size.
+        β = parse(Float64, ARGS[7]), # Inverse temperature.
+        N_therm = parse(Int, ARGS[8]), # Number of thermalization updates.
+        N_measurements = parse(Int, ARGS[9]), # Total number of measurements and measurement updates.
+        N_bins = parse(Int, ARGS[10]), # Number of times bin-averaged measurements are written to file.
         checkpoint_freq = parse(Float64, ARGS[11]), # Frequency with which checkpoint files are written in hours.
     )
-end</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../holstein_honeycomb_checkpoint/">« 1c) Honeycomb Holstein Model with Checkpointing</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.16.1 on <span class="colophon-date" title="Sunday 18 January 2026 13:36">Sunday 18 January 2026</span>. Using Julia version 1.12.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+end</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../holstein_honeycomb_checkpoint/">« 1c) Honeycomb Holstein Model with Checkpointing</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.16.1 on <span class="colophon-date" title="Monday 26 January 2026 16:32">Monday 26 January 2026</span>. Using Julia version 1.12.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
