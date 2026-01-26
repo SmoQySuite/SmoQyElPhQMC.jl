@@ -723,7 +723,7 @@ function make_phonon_greens_measurements!(
     # make phonon green's function measurement
     (; equaltime_correlations, time_displaced_correlations,
        equaltime_composite_correlations, time_displaced_composite_correlations,
-       a, a′, a″
+       a, a′, a″, pfft!
     ) = measurement_container
 
     # measure equal-time phonon greens function
@@ -748,7 +748,7 @@ function make_phonon_greens_measurements!(
         if equaltime_composite_correlations[name].correlation == "phonon_greens"
             # measure equal-time composite phonon green's function
             SmoQyDQMC.measure_equaltime_composite_phonon_greens!(
-                equaltime_composite_correlations[name], electron_phonon_parameters, model_geometry, 1.0, a, a′, a″
+                equaltime_composite_correlations[name], electron_phonon_parameters, model_geometry, 1.0, a, a′, a″, pfft!
             )
         end
     end
@@ -759,7 +759,7 @@ function make_phonon_greens_measurements!(
         if time_displaced_composite_correlations[name].correlation == "phonon_greens"
             # measure equal-time composite phonon green's function
             SmoQyDQMC.measure_time_displaced_composite_phonon_greens!(
-                time_displaced_composite_correlations[name], electron_phonon_parameters, model_geometry, 1.0, a, a′, a″
+                time_displaced_composite_correlations[name], electron_phonon_parameters, model_geometry, 1.0, a, a′, a″, pfft!
             )
         end
     end
