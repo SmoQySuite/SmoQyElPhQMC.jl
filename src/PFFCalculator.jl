@@ -61,7 +61,7 @@ function sample_pseudofermion_fields!(
 ) where {T<:Number, E<:AbstractFloat}
 
     (; Λ, Φ) = pff_calculator
-    # initiliaze Λ
+    # initialize Λ
     update_Λ!(Λ, electron_phonon_parameters)
     # initialize R
     randn!(rng, Φ)
@@ -108,7 +108,7 @@ function calculate_fermionic_action!(
     # Sf = Φᵀ⋅Ψ = Φᵀ⋅[Aᵀ⋅A]⁻¹⋅Φ
     Sf = dot(Φ,Ψ)
     if sqrt(tol) < abs(imag(Sf)/real(Sf))
-        @warn "Complex Fermionic Action Encountered, Sf = $Sf"
+        @warn "Complex Fermionic Action Encountered." Sf tol sqrt(tol) abs(imag(Sf)/real(Sf))
     end
     Sf = real(Sf)
 
