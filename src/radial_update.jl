@@ -121,6 +121,9 @@ function radial_update!(
     # initialize final fermionic action to zero.
     Sf′ = 0.0
 
+    # initializer iters to zero
+    iters = 0
+
     # Attempt to compute final fermionic action
     try
 
