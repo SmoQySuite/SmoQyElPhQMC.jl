@@ -85,7 +85,7 @@ end
     ) where {T, E}
 
 Perform an EFA-PFF-HMC update to the phonon fields.
-Acronym EFA-PFF-HMC stands for pseudofermion field (PPF) Hamiltonian/hyrbid Monte Carlo (HMC) update
+Acronym EFA-PFF-HMC stands for pseudofermion field (PPF) Hamiltonian/hybrid Monte Carlo (HMC) update
 with exact Fourier acceleration (EFA) used to reduce autocorrelation times.
 
 # Keyword Arguments with Default Values
@@ -152,8 +152,11 @@ function hmc_update!(
     SmoQyDQMC.update!(fermion_path_integral, electron_phonon_parameters, x, +1)
     update!(fermion_det_matrix, fermion_path_integral)
 
-    # average iterages initlized to zero
+    # average iterations initialized to zero
     iters_avg = zero(E)
+
+    # variable to keep track of whether numerical stability was maintained
+    numerically_stable = true
 
     # iterate over HMC time-steps
     for t in 1:Nt
@@ -161,11 +164,27 @@ function hmc_update!(
         # initialize derivative of action to zero
         fill!(∂S∂x, 0)
 
-        # calculate derivative of fermionic action for spin-up electrons
-        Sf, iters, ϵ = calculate_derivative_fermionic_action!(
-            ∂S∂x, pff_calculator, electron_phonon_parameters, fermion_det_matrix, preconditioner, rng, tol_force, maxiter
-        )
-        iters_avg += iters / (Nt+1)
+        # attempt to evaluate the derivative of the fermionic action
+        try
+
+            # calculate derivative of fermionic action for spin-up electrons
+            Sf, iters, ϵ = calculate_derivative_fermionic_action!(
+                ∂S∂x, pff_calculator, electron_phonon_parameters, fermion_det_matrix, preconditioner, rng, tol_force, maxiter
+            )
+            iters_avg += iters / (Nt+1)
+        
+        # if a numerical instability occurred
+        catch e
+
+            # warn that a numerical instability occurred during the update
+            @warn "Failed to evaluate derivative of Fermionic action during EFA-PFF-HMC trajectory, rejecting update." exception=(e, catch_backtrace())
+
+            # set numerically stable to false
+            numerically_stable = false
+
+            # exit the HMC update
+            break
+        end
 
         # calculate the anharmonic phonon potential contribution to the action derivative
         SmoQyDQMC.eval_derivative_anharmonic_action!(∂S∂x, x, Δτ, phonon_parameters)
@@ -186,30 +205,59 @@ function hmc_update!(
         update!(fermion_det_matrix, fermion_path_integral)
     end
 
-    # calculate final fermionic action
-    Sf′, iters, ϵ = calculate_fermionic_action!(
-        pff_calculator, electron_phonon_parameters, fermion_det_matrix,
-        preconditioner, rng, tol_action, maxiter
-    )
-    iters_avg += iters / (Nt+1)
+    # initialize variable to record final fermionic action
+    Sf′ = 0.0
 
-    # calculate final bosonic action
-    Sb′ = SmoQyDQMC.bosonic_action(electron_phonon_parameters, holstein_correction = false)
+    # proceed with update if numerically stable
+    if numerically_stable
 
-    # calculate final total action
-    S′ = Sf′ + Sb′
+        # attempt to calculate final fermionic action
+        try
+            # calculate final fermionic action
+            Sf′, iters, ϵ = calculate_fermionic_action!(
+                pff_calculator, electron_phonon_parameters, fermion_det_matrix,
+                preconditioner, rng, tol_action, maxiter
+            )
+            iters_avg += iters / (Nt+1)
 
-    # calculate final total kinetic energy
-    K′ = SmoQyDQMC.kinetic_energy(p, efa)
+        # if a numerical instability occurred
+        catch e
 
-    # calculate total final energy
-    H′= S′ + K′
+            # warn that a numerical instability occurred during the update
+            @warn "Failed to evaluate final fermionic action in EFA-PFF-HMC update, rejecting update." exception=(e, catch_backtrace())
 
-    # calculate change in energy from initial to final state
-    ΔH = H′ - H
+            # set numerically stable to false
+            numerically_stable = false
+        end
+    end
 
-    # calculate the acceptance probability
-    P = min(1.0, exp(-ΔH))
+    # if numerically stable proceed with update
+    if numerically_stable
+
+        # calculate final bosonic action
+        Sb′ = SmoQyDQMC.bosonic_action(electron_phonon_parameters, holstein_correction = false)
+
+        # calculate final total action
+        S′ = Sf′ + Sb′
+
+        # calculate final total kinetic energy
+        K′ = SmoQyDQMC.kinetic_energy(p, efa)
+
+        # calculate total final energy
+        H′= S′ + K′
+
+        # calculate change in energy from initial to final state
+        ΔH = H′ - H
+
+        # calculate the acceptance probability
+        P = min(1.0, exp(-ΔH))
+
+    # if numerically unstable
+    else
+
+        # set acceptance rate to zero
+        P = 0.0
+    end
 
     # determine if update accepted
     accepted = rand(rng) < P

@@ -115,23 +115,52 @@ function radial_update!(
     # update the fermion determinant matrix
     update!(fermion_det_matrix, fermion_path_integral)
 
-    # calculate final fermionic action
-    Sf′, iters, ϵ = calculate_fermionic_action!(
-        pff_calculator, electron_phonon_parameters, fermion_det_matrix,
-        preconditioner, rng, tol, maxiter
-    )
+    # flag to asses numerical stability
+    numerically_stable = true
 
-    # calculate the initial bosonic action
-    Sb′ = SmoQyDQMC.bosonic_action(electron_phonon_parameters, holstein_correction = false)
+    # initialize final fermionic action to zero.
+    Sf′ = 0.0
 
-    # calculate total final action
-    S′ = Sf′ + Sb′
+    # Attempt to compute final fermionic action
+    try
 
-    # calculate the change in action
-    ΔS = S′ - S
+        # calculate final fermionic action
+        Sf′, iters, ϵ = calculate_fermionic_action!(
+            pff_calculator, electron_phonon_parameters, fermion_det_matrix,
+            preconditioner, rng, tol, maxiter
+        )
 
-    # calculate acceptance probability
-    P = min(1.0, exp(-ΔS + d*γ))
+    # If failed to calculate the final fermionic action.
+    catch e
+
+        # provide info about failed proposal
+        @info "Failed to evaluate Green's function matrix for proposed state in radial update, update rejected." exception=(e, catch_backtrace())
+
+        # record numerical instability
+        numerically_stable = false
+    end
+
+    # proceed with update if numerically stable
+    if numerically_stable
+
+        # calculate the initial bosonic action
+        Sb′ = SmoQyDQMC.bosonic_action(electron_phonon_parameters, holstein_correction = false)
+
+        # calculate total final action
+        S′ = Sf′ + Sb′
+
+        # calculate the change in action
+        ΔS = S′ - S
+
+        # calculate acceptance probability
+        P = min(1.0, exp(-ΔS + d*γ))
+
+    # if numerically unstable
+    else
+
+        # set acceptance probability to zero
+        P = 0.0
+    end
 
     # if update is accepted
     if rand(rng) < P
