@@ -292,7 +292,7 @@ function to calculate the total number of orbitals in our system.
         )
 
         # Initialize MuTunerLogger type that will be used to dynamically adjust the
-        # chemicaml potential during the simulation.
+        # chemical potential during the simulation.
         chemical_potential_tuner = mt.init_mutunerlogger(
             target_density = n,
             inverse_temperature = β,
@@ -435,15 +435,15 @@ instance `chemical_potential_tuner` from the checkpoint file.
         checkpoint, checkpoint_timestamp = read_jld2_checkpoint(simulation_info)
 
         # Unpack contents of checkpoint dictionary.
-        tight_binding_parameters    = checkpoint["tight_binding_parameters"]
-        electron_phonon_parameters  = checkpoint["electron_phonon_parameters"]
-        chemical_potential_tuner    = checkpoint["chemical_potential_tuner"]
-        measurement_container       = checkpoint["measurement_container"]
-        model_geometry              = checkpoint["model_geometry"]
-        metadata                    = checkpoint["metadata"]
-        rng                         = checkpoint["rng"]
-        n_therm                     = checkpoint["n_therm"]
-        n_measurements                   = checkpoint["n_measurements"]
+        tight_binding_parameters = checkpoint["tight_binding_parameters"]
+        electron_phonon_parameters = checkpoint["electron_phonon_parameters"]
+        chemical_potential_tuner = checkpoint["chemical_potential_tuner"]
+        measurement_container = checkpoint["measurement_container"]
+        model_geometry = checkpoint["model_geometry"]
+        metadata = checkpoint["metadata"]
+        rng = checkpoint["rng"]
+        n_therm = checkpoint["n_therm"]
+        n_measurements = checkpoint["n_measurements"]
     end
 ````
 

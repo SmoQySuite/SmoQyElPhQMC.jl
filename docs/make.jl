@@ -109,7 +109,7 @@ makedocs(;
         "Home" => "index.md",
         "API" => "api.md",
         "Tutorials" => tutorial_mds,
-        # "Examples" => examples_mds,
+        "Examples" => example_mds,
     ],
 )
 
