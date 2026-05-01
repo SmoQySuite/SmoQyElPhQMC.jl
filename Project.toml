@@ -1,6 +1,6 @@
 name = "SmoQyElPhQMC"
 uuid = "2e896e94-a4a1-44d3-bdd1-72a60ceb4988"
-version = "1.0.0-DEV"
+version = "0.1.0"
 authors = ["Benjamin Cohen-Stead <benwcs@gmail.com>", "Steven Johnston <sjohn145@utk.edu>"]
 
 [deps]
@@ -33,7 +33,7 @@ MuTuner = "1.2.4"
 PkgVersion = "0.3.3"
 Random = "1.11.0"
 ShiftedArrays = "2.0.0"
-SmoQyDQMC = "2.0.8"
+SmoQyDQMC = "2.0.11"
 SmoQyKPMCore = "0.1.4"
 StaticArrays = "1.9"
 Statistics = "1.11.1"

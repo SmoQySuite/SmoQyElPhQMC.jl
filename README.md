@@ -31,7 +31,7 @@ A more detailed description of the algorithms used in this package will appear i
 
 ## Documentation
 
-<!-- - [STABLE](https://SmoQySuite.github.io/SmoQyElPhQMC.jl/stable/): Documentation for the latest version of the code published to the Julia [`General`](https://github.com/JuliaRegistries/General.git) registry. -->
+- [STABLE](https://SmoQySuite.github.io/SmoQyElPhQMC.jl/stable/): Documentation for the latest version of the code published to the Julia [`General`](https://github.com/JuliaRegistries/General.git) registry.
 - [DEV](https://SmoQySuite.github.io/SmoQyElPhQMC.jl/dev/): Documentation for the latest commit to the `main` branch.
 
 ## Funding

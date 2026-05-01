@@ -80,8 +80,7 @@ tutorials_sources = [joinpath(pkgdir(SmoQyElPhQMC, "tutorials"), tutorial*".jl")
 tutorial_mds = build_examples(tutorials_sources, "tutorials")
 
 # build examples
-examples = ["bssh_chain", "ossh_chain", "bssh_square", "ossh_square"]
-# examples = ["ossh_chain", "bssh_chain", "ossh_square", "bssh_square"]
+examples = ["bssh_chain", "ossh_chain", "bssh_square", "ossh_square", "ossh_honeycomb"]
 example_sources = [joinpath(pkgdir(SmoQyElPhQMC, "examples"), example*".jl") for example in examples]
 example_mds = build_examples(example_sources, "examples")
 
