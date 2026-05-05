@@ -29,6 +29,19 @@ This package implements a modified version of the algorithm introduced in this a
 
 A more detailed description of the algorithms used in this package will appear in a future publication.
 
+## Installation
+
+To install the [SmoQyElPhQMC.jl](https://github.com/SmoQySuite/SmoQyElPhQMC.jl),
+simply open the Julia REPL and run the command
+```julia
+julia> ]
+pkg> add SmoQyElPhQMC
+```
+or equivalently via `Pkg` do
+```julia
+julia> using Pkg; Pkg.add("SmoQyElPhQMC")
+```
+
 ## Documentation
 
 - [STABLE](https://SmoQySuite.github.io/SmoQyElPhQMC.jl/stable/): Documentation for the latest version of the code published to the Julia [`General`](https://github.com/JuliaRegistries/General.git) registry.
