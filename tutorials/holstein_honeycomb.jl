@@ -510,7 +510,7 @@ function run_simulation(;
 # estimating fermionic correlation functions when making measurements.
 
     ## Initialize Green's function estimator for making measurements.
-    greens_estimator = GreensEstimator(fermion_det_matrix, model_geometry)
+    greens_estimator = GreensEstimator(fermion_det_matrix, model_geometry, Nrv = Nrv)
 
 # ## [Setup EFA-PFF-HMC Updates](@id holstein_square_efa-hmc_updates)
 # Before we begin the simulation, we also want to initialize an instance of the [`EFAPFFHMCUpdater`](@ref) type,

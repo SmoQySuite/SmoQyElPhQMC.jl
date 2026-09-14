@@ -552,25 +552,44 @@ end
 
 # update KPM preconditioner to reflect fermion determinant matrix
 function update_preconditioner!(
-    Pkpm::KPMPreconditioner,
+    Pkpm::KPMPreconditioner{T,E},
     fermion_det_matrix::FermionDetMatrix,
     rng::AbstractRNG
-)
+) where {T<:Number, E<:AbstractFloat}
 
     (; B̄, rbuf) = Pkpm
 
     # update B̄ propagator matrix
     update_B̄!(B̄, fermion_det_matrix)
 
-    # calculate eigenvalue bounds
-    ϵ_min_new, ϵ_max_new = calculate_bounds!(Pkpm, rng)
+    # initialize new eigenvalue bounds to NaN
+    ϵ_min_new, ϵ_max_new = zero(E), zero(E)
 
-    # adjust eigenvalue bounds using buffer
-    ϵ_min_new = (1-rbuf)*ϵ_min_new
-    ϵ_max_new = (1+rbuf)*ϵ_max_new
+    # attempt to calculate eigenvalue bounds
+    try
+
+        # calculate eigenvalue bounds
+        ϵ_min_new, ϵ_max_new = calculate_bounds!(Pkpm, rng)
+
+        # adjust eigenvalue bounds using buffer
+        ϵ_min_new = (1-rbuf)*ϵ_min_new
+        ϵ_max_new = (1+rbuf)*ϵ_max_new
+
+        # activate the preconditioner
+        Pkpm.active = true
+
+    # if failed to calculate eigenvalue bounds
+    catch e
+
+        # warn that kpm preconditioner has been disable because of failure to calculate eigenvalue bounds
+        @warn "Preconditioner disabled due to failure to evaluate eigenvalue bounds with Lanczos." exception=(e, catch_backtrace())
+
+        # deactivate the preconditioner
+        Pkpm.active = false
+    end
 
     # check if reasonable eigenvalue bounds were found
-    if (0.0 < ϵ_min_new < 1.0) && (1.0 < ϵ_max_new < 2.0)
+    if (0.0 < ϵ_min_new < 1.0) && (1.0 < ϵ_max_new < 2.0) && Pkpm.active
 
         # activate the preconditioner
         Pkpm.active = true

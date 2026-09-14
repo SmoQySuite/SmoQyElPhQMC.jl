@@ -561,7 +561,7 @@ estimating fermionic correlation functions when making measurements.
 
 ````julia
     # Initialize Green's function estimator for making measurements.
-    greens_estimator = GreensEstimator(fermion_det_matrix, model_geometry)
+    greens_estimator = GreensEstimator(fermion_det_matrix, model_geometry, Nrv = Nrv)
 ````
 
 ## [Setup EFA-PFF-HMC Updates](@id holstein_square_efa-hmc_updates)
@@ -630,10 +630,10 @@ the [`hmc_update!`](@ref) function below, we will also perform reflection and sw
             rng = rng, tol = tol, maxiter = maxiter
         )
 
-        # Record whether the reflection update was accepted or rejected.
+        # Record whether the swap update was accepted or rejected.
         metadata["swap_acceptance_rate"] += accepted
 
-        # Record the number of CG iterations performed for the reflection update.
+        # Record the number of CG iterations performed for the swap update.
         metadata["swap_iters"] += iters
 
         # Perform an HMC update.
@@ -650,7 +650,7 @@ the [`hmc_update!`](@ref) function below, we will also perform reflection and sw
         # Record the average number of iterations per CG solve for hmc update.
         metadata["hmc_acceptance_rate"] += accepted
 
-        # Record the number of CG iterations performed for the reflection update.
+        # Record the number of CG iterations performed for the hmc update.
         metadata["hmc_iters"] += iters
     end
 ````
@@ -691,10 +691,10 @@ structure of this part of the code, refer to here.
             rng = rng, tol = tol, maxiter = maxiter
         )
 
-        # Record whether the reflection update was accepted or rejected.
+        # Record whether the swap update was accepted or rejected.
         metadata["swap_acceptance_rate"] += accepted
 
-        # Record the number of CG iterations performed for the reflection update.
+        # Record the number of CG iterations performed for the swap update.
         metadata["swap_iters"] += iters
 
         # Perform an HMC update.
@@ -708,7 +708,7 @@ structure of this part of the code, refer to here.
             rng = rng,
         )
 
-        # Record whether the reflection update was accepted or rejected.
+        # Record whether the hmc update was accepted or rejected.
         metadata["hmc_acceptance_rate"] += accepted
 
         # Record the average number of iterations per CG solve for hmc update.

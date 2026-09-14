@@ -107,6 +107,7 @@ makedocs(;
     pages=[
         "Home" => "index.md",
         "API" => "api.md",
+        "Tip & Tricks" => "tips_and_tricks.md",
         "Tutorials" => tutorial_mds,
         "Examples" => example_mds,
     ],

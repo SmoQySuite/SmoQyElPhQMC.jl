@@ -447,7 +447,7 @@ function run_simulation(
     preconditioner = KPMPreconditioner(fermion_det_matrix, rng = rng)
 
     ## Initialize Green's function estimator for making measurements.
-    greens_estimator = GreensEstimator(fermion_det_matrix, model_geometry)
+    greens_estimator = GreensEstimator(fermion_det_matrix, model_geometry, Nrv = Nrv)
 
 # ## Setup EFA-PFF-HMC Updates
 # No changes need to made to this section of the code from the previous

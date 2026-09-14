@@ -297,7 +297,7 @@ function make_correlation_measurements!(
 
         elseif (correlation == "current_upup") || (correlation == "current_dndn")
 
-            (; bond_ids, bond_slices) = tight_binding_parameters
+            (; bond_ids, hopping_slices) = tight_binding_parameters
             t = fermion_path_integral.t
 
             for i in eachindex(id_pairs)
@@ -313,8 +313,8 @@ function make_correlation_measurements!(
                 b″ = bonds[bond_id_0]
                 b′ = bonds[bond_id_1]
                 # get the effective hopping amptlitudes for each of the two hopping ID's in question
-                t0 = reshape(view(t, bond_slices[hopping_id_0], :), (L...,Lτ))
-                t1 = reshape(view(t, bond_slices[hopping_id_1], :), (L...,Lτ))
+                t0 = reshape(view(t, hopping_slices[hopping_id_0], :), (L...,Lτ))
+                t1 = reshape(view(t, hopping_slices[hopping_id_1], :), (L...,Lτ))
                 # reshape hopping into approxpropriate shape
                 t″ = PermutedDimsArray(t0, (D+1, 1:D...))
                 t′ = PermutedDimsArray(t1, (D+1, 1:D...))
@@ -328,7 +328,7 @@ function make_correlation_measurements!(
 
         elseif (correlation == "current_updn") || (correlation == "current_dnup")
 
-            (; bond_ids, bond_slices) = tight_binding_parameters
+            (; bond_ids, hopping_slices) = tight_binding_parameters
             t = fermion_path_integral.t
 
             for i in eachindex(id_pairs)
@@ -344,8 +344,8 @@ function make_correlation_measurements!(
                 b″ = bonds[bond_id_0]
                 b′ = bonds[bond_id_1]
                 # get the effective hopping amptlitudes for each of the two hopping ID's in question
-                t0 = reshape(view(t, bond_slices[hopping_id_0], :), (L...,Lτ))
-                t1 = reshape(view(t, bond_slices[hopping_id_1], :), (L...,Lτ))
+                t0 = reshape(view(t, hopping_slices[hopping_id_0], :), (L...,Lτ))
+                t1 = reshape(view(t, hopping_slices[hopping_id_1], :), (L...,Lτ))
                 # reshape hopping into approxpropriate shape
                 t″ = PermutedDimsArray(t0, (D+1, 1:D...))
                 t′ = PermutedDimsArray(t1, (D+1, 1:D...))
@@ -359,7 +359,7 @@ function make_correlation_measurements!(
 
         elseif correlation == "current"
 
-            (; bond_ids, bond_slices) = tight_binding_parameters
+            (; bond_ids, hopping_slices) = tight_binding_parameters
             t = fermion_path_integral.t
 
             for i in eachindex(id_pairs)
@@ -375,8 +375,8 @@ function make_correlation_measurements!(
                 b″ = bonds[bond_id_0]
                 b′ = bonds[bond_id_1]
                 # get the effective hopping amptlitudes for each of the two hopping ID's in question
-                t0 = reshape(view(t, bond_slices[hopping_id_0], :), (L...,Lτ))
-                t1 = reshape(view(t, bond_slices[hopping_id_1], :), (L...,Lτ))
+                t0 = reshape(view(t, hopping_slices[hopping_id_0], :), (L...,Lτ))
+                t1 = reshape(view(t, hopping_slices[hopping_id_1], :), (L...,Lτ))
                 # reshape hopping into approxpropriate shape
                 t″ = PermutedDimsArray(t0, (D+1, 1:D...))
                 t′ = PermutedDimsArray(t1, (D+1, 1:D...))
@@ -601,7 +601,7 @@ function make_composite_correlation_measurements!(
 
         elseif (correlation == "current_upup") || (correlation == "current_dndn")
 
-            (; bond_ids, bond_slices) = tight_binding_parameters
+            (; bond_ids, hopping_slices) = tight_binding_parameters
             t = fermion_path_integral.t
 
             for index in eachindex(id_pairs)
@@ -616,8 +616,8 @@ function make_composite_correlation_measurements!(
                 b″ = bonds[bond_id_j]
                 b′ = bonds[bond_id_i]
                 # get hopping amplitudes associated with hopping IDs
-                tj = reshape(view(t, bond_slices[hopping_id_j], :), (L...,Lτ))
-                ti = reshape(view(t, bond_slices[hopping_id_i], :), (L...,Lτ))
+                tj = reshape(view(t, hopping_slices[hopping_id_j], :), (L...,Lτ))
+                ti = reshape(view(t, hopping_slices[hopping_id_i], :), (L...,Lτ))
                 # reshape array containing hopping amplitudes
                 t″ = PermutedDimsArray(tj, (D+1, 1:D...))
                 t′ = PermutedDimsArray(ti, (D+1, 1:D...))
@@ -637,7 +637,7 @@ function make_composite_correlation_measurements!(
 
         elseif (correlation == "current_updn") || (correlation == "current_dnup")
 
-            (; bond_ids, bond_slices) = tight_binding_parameters
+            (; bond_ids, hopping_slices) = tight_binding_parameters
             t = fermion_path_integral.t
 
             for index in eachindex(id_pairs)
@@ -652,8 +652,8 @@ function make_composite_correlation_measurements!(
                 b″ = bonds[bond_id_j]
                 b′ = bonds[bond_id_i]
                 # get hopping amplitudes associated with hopping IDs
-                tj = reshape(view(t, bond_slices[hopping_id_j], :), (L...,Lτ))
-                ti = reshape(view(t, bond_slices[hopping_id_i], :), (L...,Lτ))
+                tj = reshape(view(t, hopping_slices[hopping_id_j], :), (L...,Lτ))
+                ti = reshape(view(t, hopping_slices[hopping_id_i], :), (L...,Lτ))
                 # reshape array containing hopping amplitudes
                 t″ = PermutedDimsArray(tj, (D+1, 1:D...))
                 t′ = PermutedDimsArray(ti, (D+1, 1:D...))
@@ -673,7 +673,7 @@ function make_composite_correlation_measurements!(
 
         elseif correlation == "current"
 
-            (; bond_ids, bond_slices) = tight_binding_parameters
+            (; bond_ids, hopping_slices) = tight_binding_parameters
             t = fermion_path_integral.t
 
             for index in eachindex(id_pairs)
@@ -688,8 +688,8 @@ function make_composite_correlation_measurements!(
                 b″ = bonds[bond_id_j]
                 b′ = bonds[bond_id_i]
                 # get hopping amplitudes associated with hopping IDs
-                tj = reshape(view(t, bond_slices[hopping_id_j], :), (L...,Lτ))
-                ti = reshape(view(t, bond_slices[hopping_id_i], :), (L...,Lτ))
+                tj = reshape(view(t, hopping_slices[hopping_id_j], :), (L...,Lτ))
+                ti = reshape(view(t, hopping_slices[hopping_id_i], :), (L...,Lτ))
                 # reshape array containing hopping amplitudes
                 t″ = PermutedDimsArray(tj, (D+1, 1:D...))
                 t′ = PermutedDimsArray(ti, (D+1, 1:D...))

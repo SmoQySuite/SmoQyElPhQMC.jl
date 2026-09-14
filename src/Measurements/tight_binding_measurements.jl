@@ -104,16 +104,16 @@ function measure_bare_hopping_energy(
 ) where {D, T<:Number, E<:AbstractFloat}
 
     (; N, n, Lτ, Nrv) = greens_estimator
-    (; bond_slices) = tight_binding_parameters
+    (; hopping_slices) = tight_binding_parameters
 
     # initialize hopping energy to zero
     h = zero(Complex{E})
 
     # get the hopping associated with the hopping id
-    t = @view tight_binding_parameters.t[bond_slices[hopping_id]]
+    t = @view tight_binding_parameters.t[hopping_slices[hopping_id]]
 
     # get the neighbor table associated with the hopping id
-    neighbor_table = @view tight_binding_parameters.neighbor_table[:,bond_slices[hopping_id]]
+    neighbor_table = @view tight_binding_parameters.neighbor_table[:,hopping_slices[hopping_id]]
 
     # total number of sites in lattice given that N is number of unit cells
     # and n is the number of orbitals per unit cell
@@ -161,16 +161,16 @@ function measure_hopping_energy(
 ) where {D, T<:Number, E<:AbstractFloat}
 
     (; N, n, Lτ, Nrv) = greens_estimator
-    (; bond_slices) = tight_binding_parameters
+    (; hopping_slices) = tight_binding_parameters
 
     # initialize hopping energy to zero
     h = zero(Complex{E})
 
     # get the hopping associated with the hopping id
-    t = @view fermion_path_integral.t[bond_slices[hopping_id],:]
+    t = @view fermion_path_integral.t[hopping_slices[hopping_id],:]
 
     # get the neighbor table associated with the hopping id
-    neighbor_table = @view tight_binding_parameters.neighbor_table[:,bond_slices[hopping_id]]
+    neighbor_table = @view tight_binding_parameters.neighbor_table[:,hopping_slices[hopping_id]]
 
     # total number of sites in lattice given that N is number of unit cells
     # and n is the number of orbitals per unit cell
