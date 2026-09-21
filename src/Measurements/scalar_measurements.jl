@@ -34,7 +34,7 @@ function measure_Nsqrd(
 
     (; V, N, n, Lτ, Nrv, Rt, GR) = greens_estimator
 
-    # n is number of obritals per unit cell
+    # n is number of orbitals per unit cell
     # N is number of unit cells
     # Lτ is length of imaginary time axis
     # V is the total space-time volume
